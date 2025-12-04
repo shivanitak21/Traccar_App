@@ -1,0 +1,375 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  StyleSheet,
+  Text,
+  ActivityIndicator,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { GlassCard } from '../components/GlassCard';
+import {
+  Info,
+  Activity,
+  Battery,
+  Signal,
+  Thermometer,
+  Gauge,
+  MapPin,
+  X,
+} from 'lucide-react-native';
+
+interface DeviceInfoScreenProps {
+  deviceId: number;
+  onClose?: () => void;
+}
+
+export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, onClose }) => {
+  const [device, setDevice] = useState<TraccarDevice | null>(null);
+  const [position, setPosition] = useState<TraccarPosition | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    try {
+      const [deviceData, positions] = await Promise.all([
+        traccarAPI.getDevice(deviceId),
+        traccarAPI.getPositions(deviceId),
+      ]);
+
+      setDevice(deviceData);
+      if (positions.length > 0) {
+        setPosition(positions[0]);
+      }
+    } catch (error) {
+      console.error('Failed to load device info:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [deviceId]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading device info...</Text>
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Device not found</Text>
+      </View>
+    );
+  }
+
+  const battery = position?.attributes?.battery;
+  const fuel = position?.attributes?.fuel;
+  const temperature = position?.attributes?.deviceTemp;
+  const odometer = position?.attributes?.totalDistance
+    ? (position.attributes.totalDistance / 1000).toFixed(2)
+    : null;
+
+  return (
+    <LinearGradient colors={colors.gradient.dark} style={styles.container}>
+      {onClose && (
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <X color={colors.text.primary} size={24} />
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.header}>
+        <Info color={colors.primary} size={32} />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Device Information</Text>
+          <Text style={styles.subtitle}>{device.name}</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <GlassCard style={styles.section}>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Name:</Text>
+            <Text style={styles.infoValue}>{device.name}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Unique ID:</Text>
+            <Text style={styles.infoValue}>{device.uniqueId}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Model:</Text>
+            <Text style={styles.infoValue}>{device.model || 'N/A'}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Category:</Text>
+            <Text style={styles.infoValue}>{device.category || 'N/A'}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Status:</Text>
+            <Text
+              style={[
+                styles.infoValue,
+                { color: device.status === 'online' ? colors.success : colors.error },
+              ]}
+            >
+              {device.status}
+            </Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Last Update:</Text>
+            <Text style={styles.infoValue}>
+              {device.lastUpdate ? new Date(device.lastUpdate).toLocaleString() : 'N/A'}
+            </Text>
+          </View>
+        </GlassCard>
+
+        {position && (
+          <GlassCard style={styles.section}>
+            <Text style={styles.sectionTitle}>Current Position</Text>
+
+            <View style={styles.sensorGrid}>
+              <View style={styles.sensorCard}>
+                <MapPin color={colors.primary} size={24} />
+                <Text style={styles.sensorLabel}>Coordinates</Text>
+                <Text style={styles.sensorValue}>
+                  {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
+                </Text>
+              </View>
+
+              <View style={styles.sensorCard}>
+                <Gauge color={colors.success} size={24} />
+                <Text style={styles.sensorLabel}>Speed</Text>
+                <Text style={styles.sensorValue}>{Math.round(position.speed * 1.852)} km/h</Text>
+              </View>
+
+              <View style={styles.sensorCard}>
+                <Activity color={colors.warning} size={24} />
+                <Text style={styles.sensorLabel}>Altitude</Text>
+                <Text style={styles.sensorValue}>{Math.round(position.altitude)} m</Text>
+              </View>
+
+              <View style={styles.sensorCard}>
+                <Signal color={colors.secondary} size={24} />
+                <Text style={styles.sensorLabel}>Protocol</Text>
+                <Text style={styles.sensorValue}>{position.protocol}</Text>
+              </View>
+            </View>
+
+            {position.address && (
+              <View style={styles.addressContainer}>
+                <Text style={styles.addressLabel}>Address:</Text>
+                <Text style={styles.addressText}>{position.address}</Text>
+              </View>
+            )}
+          </GlassCard>
+        )}
+
+        <GlassCard style={styles.section}>
+          <Text style={styles.sectionTitle}>Sensors & Attributes</Text>
+
+          <View style={styles.sensorGrid}>
+            {battery !== undefined && battery !== null && (
+              <View style={styles.sensorCard}>
+                <Battery color={battery > 20 ? colors.success : colors.error} size={24} />
+                <Text style={styles.sensorLabel}>Battery</Text>
+                <Text style={styles.sensorValue}>{Math.round(battery)}%</Text>
+              </View>
+            )}
+
+            {fuel !== undefined && fuel !== null && (
+              <View style={styles.sensorCard}>
+                <Gauge color={colors.primary} size={24} />
+                <Text style={styles.sensorLabel}>Fuel</Text>
+                <Text style={styles.sensorValue}>{Math.round(fuel)} L</Text>
+              </View>
+            )}
+
+            {temperature !== undefined && temperature !== null && (
+              <View style={styles.sensorCard}>
+                <Thermometer color={colors.warning} size={24} />
+                <Text style={styles.sensorLabel}>Temperature</Text>
+                <Text style={styles.sensorValue}>{Math.round(temperature)}°C</Text>
+              </View>
+            )}
+
+            {odometer && (
+              <View style={styles.sensorCard}>
+                <Activity color={colors.secondary} size={24} />
+                <Text style={styles.sensorLabel}>Odometer</Text>
+                <Text style={styles.sensorValue}>{odometer} km</Text>
+              </View>
+            )}
+          </View>
+
+          {(!battery && !fuel && !temperature && !odometer) && (
+            <Text style={styles.noSensorsText}>No sensor data available</Text>
+          )}
+        </GlassCard>
+
+        {device.contact && (
+          <GlassCard style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact:</Text>
+              <Text style={styles.infoValue}>{device.contact}</Text>
+            </View>
+            {device.phone && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Phone:</Text>
+                <Text style={styles.infoValue}>{device.phone}</Text>
+              </View>
+            )}
+          </GlassCard>
+        )}
+      </ScrollView>
+    </LinearGradient>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: 16,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.glass.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+  },
+  headerText: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  title: {
+    ...typography.h2,
+    color: colors.text.primary,
+    fontWeight: '700',
+  },
+  subtitle: {
+    ...typography.small,
+    color: colors.text.secondary,
+    marginTop: 4,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  section: {
+    padding: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text.primary,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.glass.border,
+  },
+  infoLabel: {
+    ...typography.body,
+    color: colors.text.tertiary,
+  },
+  infoValue: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  sensorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  sensorCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(0, 243, 255, 0.05)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    alignItems: 'center',
+  },
+  sensorLabel: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    marginTop: 8,
+  },
+  sensorValue: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '700',
+    fontSize: 16,
+    marginTop: 4,
+  },
+  addressContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.glass.border,
+  },
+  addressLabel: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    marginBottom: 6,
+  },
+  addressText: {
+    ...typography.body,
+    color: colors.text.primary,
+  },
+  noSensorsText: {
+    ...typography.body,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+});
