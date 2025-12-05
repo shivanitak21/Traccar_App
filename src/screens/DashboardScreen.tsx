@@ -68,19 +68,19 @@ export const DashboardScreen: React.FC = () => {
           <StatCard
             title="Total Vehicles"
             value={devices.length}
-            icon={<Car color={colors.primary} size={32} />}
+            icon={<Car color={colors.secondary} size={32} />}
             index={0}
           />
           <StatCard
             title="Online"
             value={onlineDevices}
-            icon={<Activity color={colors.success} size={32} />}
+            icon={<Activity color={colors.secondary} size={32} />}
             index={1}
           />
           <StatCard
             title="Offline"
             value={offlineDevices}
-            icon={<AlertCircle color={colors.error} size={32} />}
+            icon={<AlertCircle color={colors.secondary} size={32} />}
             index={2}
           />
           <StatCard

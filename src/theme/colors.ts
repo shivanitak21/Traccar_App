@@ -5,7 +5,7 @@ export const colors = {
   primary: '#00f3ff',
   primaryGlow: 'rgba(0, 243, 255, 0.3)',
 
-  secondary: '#ff00ff',
+  secondary: '#ffffff',
   secondaryGlow: 'rgba(255, 0, 255, 0.3)',
 
   accent: '#7700ff',

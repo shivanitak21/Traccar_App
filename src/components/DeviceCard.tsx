@@ -85,17 +85,17 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={onLiveTrack}>
-          <Navigation color={colors.primary} size={18} />
+          <Navigation color={colors.secondary} size={18} />
           <Text style={styles.actionText}>Live</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={onPlayback}>
-          <Play color={colors.success} size={18} />
+          <Play color={colors.secondary} size={18} />
           <Text style={styles.actionText}>Playback</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={onGeofence}>
-          <MapPinned color={colors.warning} size={18} />
+          <MapPinned color={colors.secondary} size={18} />
           <Text style={styles.actionText}>Geofence</Text>
         </TouchableOpacity>
 
@@ -105,7 +105,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={onCommands}>
-          <Radio color={colors.accent} size={18} />
+          <Radio color={colors.secondary} size={18} />
           <Text style={styles.actionText}>Commands</Text>
         </TouchableOpacity>
       </View>
