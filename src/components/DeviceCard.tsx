@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { GlassCard } from './GlassCard';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { TraccarDevice } from '../api/traccar';
 import { Car, Circle, Navigation, Play, MapPinned, Info, Radio } from 'lucide-react-native';
+import { getVehicleImageUrl } from '../utils/vehicleImages';
 
 interface DeviceCardProps {
   device: TraccarDevice;
@@ -27,22 +28,50 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 }) => {
   const isOnline = device.status === 'online';
   const statusColor = isOnline ? colors.success : colors.text.tertiary;
+  const vehicleImageUrl = getVehicleImageUrl(device.model, device.name);
+  const [imageError, setImageError] = React.useState(false);
+  const [imageLoading, setImageLoading] = React.useState(true);
 
   return (
     <GlassCard style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <Car color={colors.primary} size={24} />
-        </View>
-        <View style={styles.info}>
-          <Text style={styles.name}>{device.name}</Text>
-          <Text style={styles.uniqueId}>{device.uniqueId}</Text>
-        </View>
-        <View style={styles.status}>
-          <Circle color={statusColor} size={12} fill={statusColor} />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {isOnline ? 'Online' : 'Offline'}
-          </Text>
+      <View style={styles.imageContainer}>
+        {imageError ? (
+          <View style={[styles.vehicleImage, styles.placeholderContainer]}>
+            <Car color={colors.primary} size={64} />
+            <Text style={styles.placeholderText}>{device.name}</Text>
+          </View>
+        ) : (
+          <>
+            {imageLoading && (
+              <View style={[styles.vehicleImage, styles.loadingContainer]}>
+                <Car color={colors.primary} size={48} />
+              </View>
+            )}
+            <Image
+              source={{ uri: vehicleImageUrl }}
+              style={[styles.vehicleImage, imageLoading && styles.hidden]}
+              resizeMode="cover"
+              onError={() => {
+                setImageError(true);
+                setImageLoading(false);
+              }}
+              onLoad={() => setImageLoading(false)}
+            />
+          </>
+        )}
+        <View style={styles.imageOverlay}>
+          <View style={styles.header}>
+            <View style={styles.info}>
+              <Text style={styles.name}>{device.name}</Text>
+              <Text style={styles.uniqueId}>{device.uniqueId}</Text>
+            </View>
+            <View style={styles.status}>
+              <Circle color={statusColor} size={12} fill={statusColor} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {isOnline ? 'Online' : 'Offline'}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -87,20 +116,55 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 280,
+    position: 'relative',
+  },
+  vehicleImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderContainer: {
+    backgroundColor: colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    ...typography.body,
+    color: colors.text.primary,
+    marginTop: 12,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    backgroundColor: colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  hidden: {
+    opacity: 0,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 16,
+    paddingTop: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    justifyContent: 'space-between',
   },
   info: {
     flex: 1,
@@ -125,8 +189,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footer: {
-    marginTop: 12,
+    paddingHorizontal: 16,
     paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(26, 26, 46, 0.95)',
     borderTopWidth: 1,
     borderTopColor: colors.glass.border,
   },
@@ -137,10 +203,10 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     gap: 8,
-    paddingTop: 16,
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(26, 26, 46, 0.95)',
   },
   actionButton: {
     flex: 1,

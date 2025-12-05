@@ -65,18 +65,31 @@ export const MapScreen: React.FC = () => {
   };
 
   const getMarkers = () => {
-    return Array.from(positions.entries()).map(([deviceId, position]) => {
+    // Use a Map to ensure only one marker per device ID
+    const markersMap = new Map<string, any>();
+    
+    Array.from(positions.entries()).forEach(([deviceId, position]) => {
       const device = devices.find(d => d.id === deviceId);
       const speed = Math.round(position.speed * 1.852);
-      return {
-        id: deviceId.toString(),
-        latitude: position.latitude,
-        longitude: position.longitude,
-        title: device?.name || 'Unknown',
-        description: `${speed} km/h • ${new Date(position.fixTime).toLocaleTimeString()}`,
-        color: device?.status === 'online' ? colors.success : colors.error,
-      };
+      const markerId = deviceId.toString();
+      
+      // Only add if we haven't seen this device ID before
+      if (!markersMap.has(markerId)) {
+        markersMap.set(markerId, {
+          id: markerId,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          title: device?.name || 'Unknown',
+          description: `${speed} km/h • ${new Date(position.fixTime).toLocaleTimeString()}`,
+          color: device?.status === 'online' ? colors.success : colors.error,
+          deviceName: device?.name || 'Unknown',
+          deviceModel: device?.model || '',
+          status: device?.status || 'offline',
+        });
+      }
     });
+    
+    return Array.from(markersMap.values());
   };
 
   const selectedPosition = selectedDeviceId ? positions.get(selectedDeviceId) : null;
@@ -129,11 +142,14 @@ export const MapScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.deviceDetailsBody}>
-                    <Text style={styles.coordinates}>
-                      📍 {selectedPosition.latitude.toFixed(6)}, {selectedPosition.longitude.toFixed(6)}
-                    </Text>
-                    {selectedPosition.address && (
-                      <Text style={styles.address}>{selectedPosition.address}</Text>
+                    {selectedPosition.address ? (
+                      <Text style={styles.address}>
+                        📍 {selectedPosition.address}
+                      </Text>
+                    ) : (
+                      <Text style={styles.coordinates}>
+                        📍 {selectedPosition.latitude.toFixed(6)}, {selectedPosition.longitude.toFixed(6)}
+                      </Text>
                     )}
                     <Text style={styles.timestamp}>
                       Last update: {new Date(selectedPosition.fixTime).toLocaleTimeString()}

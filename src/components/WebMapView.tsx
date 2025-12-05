@@ -9,6 +9,9 @@ interface Marker {
   title?: string;
   description?: string;
   color?: string;
+  deviceName?: string;
+  deviceModel?: string;
+  status?: string;
 }
 
 interface Polyline {
@@ -39,7 +42,11 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
   const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
-    updateMap();
+    // Small delay to ensure WebView is ready
+    const timer = setTimeout(() => {
+      updateMap();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [markers, polylines, center, zoom]);
 
   const updateMap = () => {
@@ -100,6 +107,31 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
       box-shadow: 0 0 20px #00f3ff;
       animation: pulse 2s infinite;
     }
+    .device-marker {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #00f3ff;
+      border: 3px solid #fff;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      position: relative;
+    }
+    .device-marker::before {
+      content: '🚗';
+      font-size: 24px;
+    }
+    .device-marker.online {
+      background: #00ff88;
+      box-shadow: 0 0 15px rgba(0, 255, 136, 0.8);
+    }
+    .device-marker.offline {
+      background: #666;
+      box-shadow: 0 0 15px rgba(102, 102, 102, 0.8);
+    }
     @keyframes pulse {
       0%, 100% {
         transform: scale(1);
@@ -152,8 +184,17 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
     }
 
     window.updateMapData = function(data) {
-      markersLayer.forEach(m => map.removeLayer(m));
-      polylinesLayer.forEach(p => map.removeLayer(p));
+      // Remove all existing markers and polylines
+      markersLayer.forEach(m => {
+        if (map.hasLayer(m)) {
+          map.removeLayer(m);
+        }
+      });
+      polylinesLayer.forEach(p => {
+        if (map.hasLayer(p)) {
+          map.removeLayer(p);
+        }
+      });
       markersLayer = [];
       polylinesLayer = [];
 
@@ -162,11 +203,22 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
       }
 
       if (data.markers) {
+        // Use a Set to track unique marker IDs to prevent duplicates
+        const seenIds = new Set();
         data.markers.forEach(marker => {
+          // Skip if we've already processed this marker ID
+          if (seenIds.has(marker.id)) {
+            return;
+          }
+          seenIds.add(marker.id);
+          
+          const statusClass = marker.status === 'online' ? 'online' : 'offline';
           const icon = L.divIcon({
-            className: 'pulse-marker',
-            iconSize: [30, 30],
-            html: '<div class="pulse-marker"></div>'
+            className: 'device-marker ' + statusClass,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20],
+            html: '<div class="device-marker ' + statusClass + '"></div>'
           });
 
           const m = L.marker([marker.latitude, marker.longitude], { icon })
