@@ -5,14 +5,18 @@ import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
-import { WebMapView } from '../components/WebMapView';
-import { MapPin, X } from 'lucide-react-native';
+import { WebMapView, MapLayerType } from '../components/WebMapView';
+import { MapPin, X, Layers } from 'lucide-react-native';
+import { reverseGeocode } from '../utils/geocoding';
 
 export const MapScreen: React.FC = () => {
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
   const [positions, setPositions] = useState<Map<number, TraccarPosition>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
+  const [mapLayer, setMapLayer] = useState<MapLayerType>('normal');
+  const [showLayerSelector, setShowLayerSelector] = useState(false);
+  const [deviceAddresses, setDeviceAddresses] = useState<Map<number, string>>(new Map());
 
   const loadData = async () => {
     try {
@@ -24,10 +28,26 @@ export const MapScreen: React.FC = () => {
       setDevices(devicesData);
 
       const posMap = new Map<number, TraccarPosition>();
-      positionsData.forEach(pos => {
-        posMap.set(pos.deviceId, pos);
-      });
+      const addressMap = new Map<number, string>();
+      
+      // Get addresses for all positions
+      await Promise.all(
+        positionsData.map(async (pos) => {
+          posMap.set(pos.deviceId, pos);
+          
+          if (pos.address) {
+            addressMap.set(pos.deviceId, pos.address);
+          } else {
+            const addr = await reverseGeocode(pos.latitude, pos.longitude);
+            if (addr) {
+              addressMap.set(pos.deviceId, addr);
+            }
+          }
+        })
+      );
+      
       setPositions(posMap);
+      setDeviceAddresses(addressMap);
     } catch (error) {
       console.error('Failed to load map data:', error);
     } finally {
@@ -39,12 +59,30 @@ export const MapScreen: React.FC = () => {
     loadData();
     traccarWS.connect();
 
-    const handlePositionUpdate = (updatedPositions: TraccarPosition[]) => {
+    const handlePositionUpdate = async (updatedPositions: TraccarPosition[]) => {
       const posMap = new Map(positions);
-      updatedPositions.forEach(pos => {
-        posMap.set(pos.deviceId, pos);
-      });
+      const addressMap = new Map(deviceAddresses);
+      
+      await Promise.all(
+        updatedPositions.map(async (pos) => {
+          posMap.set(pos.deviceId, pos);
+          
+          // Update address if not already cached
+          if (!addressMap.has(pos.deviceId)) {
+            if (pos.address) {
+              addressMap.set(pos.deviceId, pos.address);
+            } else {
+              const addr = await reverseGeocode(pos.latitude, pos.longitude);
+              if (addr) {
+                addressMap.set(pos.deviceId, addr);
+              }
+            }
+          }
+        })
+      );
+      
       setPositions(posMap);
+      setDeviceAddresses(addressMap);
     };
 
     traccarWS.on('positions', handlePositionUpdate);
@@ -65,32 +103,52 @@ export const MapScreen: React.FC = () => {
   };
 
   const getMarkers = () => {
-    // Use a Map to ensure only one marker per device ID
-    const markersMap = new Map<string, any>();
+    // Create EXACTLY one marker per device - no duplicates
+    const uniqueMarkers: any[] = [];
+    const processedDeviceIds = new Set<number>();
     
-    Array.from(positions.entries()).forEach(([deviceId, position]) => {
-      const device = devices.find(d => d.id === deviceId);
-      const speed = Math.round(position.speed * 1.852);
-      const markerId = deviceId.toString();
-      
-      // Only add if we haven't seen this device ID before
-      if (!markersMap.has(markerId)) {
-        markersMap.set(markerId, {
-          id: markerId,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          title: device?.name || 'Unknown',
-          description: `${speed} km/h • ${new Date(position.fixTime).toLocaleTimeString()}`,
-          color: device?.status === 'online' ? colors.success : colors.error,
-          deviceName: device?.name || 'Unknown',
-          deviceModel: device?.model || '',
-          status: device?.status || 'offline',
-        });
+    // Process each position entry ONCE
+    positions.forEach((position, deviceId) => {
+      // Skip if we've already processed this device
+      if (processedDeviceIds.has(deviceId)) {
+        console.warn(`Skipping duplicate device ID: ${deviceId}`);
+        return;
       }
+      
+      const device = devices.find(d => d.id === deviceId);
+      if (!device) {
+        console.warn(`Device not found for ID: ${deviceId}`);
+        return;
+      }
+      
+      // Mark as processed
+      processedDeviceIds.add(deviceId);
+      
+      const speed = Math.round(position.speed * 1.852);
+      
+      uniqueMarkers.push({
+        id: `vehicle-${deviceId}`, // Unique string ID
+        latitude: position.latitude,
+        longitude: position.longitude,
+        title: device.name,
+        description: `${speed} km/h`,
+        color: device.status === 'online' ? colors.success : colors.error,
+        deviceName: device.name,
+        deviceModel: device.model || '',
+        status: device.status,
+      });
     });
     
-    return Array.from(markersMap.values());
+    console.log(`✓ MapScreen: ${uniqueMarkers.length} unique markers (${devices.length} total devices)`);
+    return uniqueMarkers;
   };
+
+  const mapLayers: { type: MapLayerType; label: string }[] = [
+    { type: 'normal', label: 'Normal' },
+    { type: 'satellite', label: 'Satellite' },
+    { type: 'terrain', label: 'Terrain' },
+    { type: 'hybrid', label: 'Hybrid' },
+  ];
 
   const selectedPosition = selectedDeviceId ? positions.get(selectedDeviceId) : null;
   const selectedDevice = selectedDeviceId ? devices.find(d => d.id === selectedDeviceId) : null;
@@ -106,13 +164,6 @@ export const MapScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <GlassCard style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Live Tracking</Text>
-          <Text style={styles.statsValue}>{positions.size} devices online</Text>
-        </GlassCard>
-      </View>
-
       <View style={styles.mapContainer}>
         {positions.size > 0 ? (
           <>
@@ -120,10 +171,54 @@ export const MapScreen: React.FC = () => {
               markers={getMarkers()}
               center={getMapCenter()}
               zoom={13}
-              onMarkerPress={(markerId) => setSelectedDeviceId(Number(markerId))}
+              onMarkerPress={(markerId) => {
+                // Extract device ID from marker ID (format: "vehicle-123")
+                const deviceId = parseInt(markerId.replace('vehicle-', ''));
+                if (!isNaN(deviceId)) {
+                  setSelectedDeviceId(deviceId);
+                }
+              }}
               showUserLocation={true}
+              mapLayer={mapLayer}
               style={styles.map}
             />
+            
+            <TouchableOpacity
+              style={styles.layerButton}
+              onPress={() => setShowLayerSelector(!showLayerSelector)}
+            >
+              <Layers color={colors.text.primary} size={20} />
+            </TouchableOpacity>
+
+            {showLayerSelector && (
+              <View style={styles.layerSelector}>
+                <GlassCard style={styles.layerCard}>
+                  <Text style={styles.layerTitle}>Map Type</Text>
+                  {mapLayers.map((layer) => (
+                    <TouchableOpacity
+                      key={layer.type}
+                      style={[
+                        styles.layerOption,
+                        mapLayer === layer.type && styles.layerOptionActive,
+                      ]}
+                      onPress={() => {
+                        setMapLayer(layer.type);
+                        setShowLayerSelector(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.layerOptionText,
+                          mapLayer === layer.type && styles.layerOptionTextActive,
+                        ]}
+                      >
+                        {layer.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </GlassCard>
+              </View>
+            )}
             {selectedPosition && selectedDevice && (
               <View style={styles.deviceDetailsOverlay}>
                 <GlassCard style={styles.deviceDetailsCard}>
@@ -142,15 +237,9 @@ export const MapScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.deviceDetailsBody}>
-                    {selectedPosition.address ? (
-                      <Text style={styles.address}>
-                        📍 {selectedPosition.address}
-                      </Text>
-                    ) : (
-                      <Text style={styles.coordinates}>
-                        📍 {selectedPosition.latitude.toFixed(6)}, {selectedPosition.longitude.toFixed(6)}
-                      </Text>
-                    )}
+                    <Text style={styles.address}>
+                      📍 {selectedDeviceId ? deviceAddresses.get(selectedDeviceId) || 'Loading address...' : 'No address'}
+                    </Text>
                     <Text style={styles.timestamp}>
                       Last update: {new Date(selectedPosition.fixTime).toLocaleTimeString()}
                     </Text>
@@ -186,29 +275,10 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 16,
   },
-  header: {
-    padding: 20,
-    paddingBottom: 0,
-  },
-  statsCard: {
-    padding: 20,
-    marginBottom: 20,
-  },
-  statsTitle: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  statsValue: {
-    ...typography.h2,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
   mapContainer: {
     flex: 1,
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 16,
+    margin: 0,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   map: {
@@ -248,7 +318,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.glass.fill,
+    backgroundColor: colors.glass.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -256,11 +326,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.glass.border,
-  },
-  coordinates: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginBottom: 4,
   },
   address: {
     ...typography.small,
@@ -281,5 +346,53 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.secondary,
     marginTop: 16,
+  },
+  layerButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.glass.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    zIndex: 10,
+  },
+  layerSelector: {
+    position: 'absolute',
+    top: 80,
+    right: 20,
+    zIndex: 10,
+    minWidth: 150,
+  },
+  layerCard: {
+    padding: 12,
+  },
+  layerTitle: {
+    ...typography.small,
+    color: colors.text.secondary,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  layerOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  layerOptionActive: {
+    backgroundColor: colors.primaryGlow,
+  },
+  layerOptionText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontSize: 14,
+  },
+  layerOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

@@ -21,7 +21,10 @@ import {
   Gauge,
   MapPin,
   X,
+  Navigation,
+  History,
 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
 interface DeviceInfoScreenProps {
   deviceId: number;
@@ -29,6 +32,7 @@ interface DeviceInfoScreenProps {
 }
 
 export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, onClose }) => {
+  const router = useRouter();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +99,19 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
         </View>
       </View>
 
+      <View style={styles.actionBar}>
+        <TouchableOpacity
+          style={styles.routeHistoryButton}
+          onPress={() => {
+            if (onClose) onClose();
+            router.push(`/device/${deviceId}/route-history` as any);
+          }}
+        >
+          <History color={colors.primary} size={20} />
+          <Text style={styles.routeHistoryButtonText}>Route History</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <GlassCard style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
@@ -143,14 +160,17 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
           <GlassCard style={styles.section}>
             <Text style={styles.sectionTitle}>Current Position</Text>
 
-            <View style={styles.sensorGrid}>
-              <View style={styles.sensorCard}>
-                <MapPin color={colors.primary} size={24} />
-                <Text style={styles.sensorLabel}>Coordinates</Text>
-                <Text style={styles.sensorValue}>
-                  {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
-                </Text>
+            {position.address && (
+              <View style={styles.addressContainer}>
+                <MapPin color={colors.primary} size={20} />
+                <View style={styles.addressContent}>
+                  <Text style={styles.addressLabel}>Location:</Text>
+                  <Text style={styles.addressText}>{position.address}</Text>
+                </View>
               </View>
+            )}
+
+            <View style={styles.sensorGrid}>
 
               <View style={styles.sensorCard}>
                 <Gauge color={colors.success} size={24} />
@@ -170,13 +190,6 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
                 <Text style={styles.sensorValue}>{position.protocol}</Text>
               </View>
             </View>
-
-            {position.address && (
-              <View style={styles.addressContainer}>
-                <Text style={styles.addressLabel}>Address:</Text>
-                <Text style={styles.addressText}>{position.address}</Text>
-              </View>
-            )}
           </GlassCard>
         )}
 
@@ -276,6 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 60,
+    paddingBottom: 12,
   },
   headerText: {
     marginLeft: 16,
@@ -290,6 +304,27 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.text.secondary,
     marginTop: 4,
+  },
+  actionBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  routeHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: colors.glass.background,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    gap: 8,
+  },
+  routeHistoryButtonText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
   },
   scrollContent: {
     padding: 20,
@@ -352,19 +387,29 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addressContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(0, 243, 255, 0.05)',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    marginBottom: 16,
+    gap: 10,
+  },
+  addressContent: {
+    flex: 1,
   },
   addressLabel: {
     ...typography.small,
     color: colors.text.tertiary,
-    marginBottom: 6,
+    marginBottom: 4,
+    fontWeight: '600',
   },
   addressText: {
     ...typography.body,
     color: colors.text.primary,
+    fontSize: 13,
   },
   noSensorsText: {
     ...typography.body,

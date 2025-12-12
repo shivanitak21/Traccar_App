@@ -34,6 +34,11 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     overflow: 'hidden',
+    // shadowColor: colors.primary,
+    // shadowOffset: { width: 0, height: 4 },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 8,
+    // elevation: 4,
   },
   glass: {
     backgroundColor: colors.glass.background,

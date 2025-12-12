@@ -95,7 +95,23 @@ class TraccarAPI {
       throw new Error(error || `HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    // Handle empty responses (like DELETE requests)
+    const contentType = response.headers.get('content-type');
+    const contentLength = response.headers.get('content-length');
+    
+    // If no content or content-length is 0, return null
+    if (contentLength === '0' || !contentType?.includes('application/json')) {
+      console.log('API: Empty or non-JSON response');
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      console.log('API: Empty response body');
+      return null;
+    }
+
+    const data = JSON.parse(text);
     console.log('API Data:', data);
     return data;
   }
@@ -163,6 +179,10 @@ class TraccarAPI {
     return this.request('/api/geofences');
   }
 
+  async getGeofence(id: number): Promise<TraccarGeofence> {
+    return this.request(`/api/geofences/${id}`);
+  }
+
   async createGeofence(geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
     return this.request('/api/geofences', {
       method: 'POST',
@@ -171,6 +191,23 @@ class TraccarAPI {
       },
       body: JSON.stringify(geofence),
     });
+  }
+
+  async updateGeofence(id: number, geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
+    return this.request(`/api/geofences/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(geofence),
+    });
+  }
+
+  async deleteGeofence(id: number): Promise<void> {
+    await this.request(`/api/geofences/${id}`, {
+      method: 'DELETE',
+    });
+    // DELETE returns empty response, which is expected
   }
 
   async getEvents(deviceId?: number, from?: string, to?: string): Promise<TraccarEvent[]> {
