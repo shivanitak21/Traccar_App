@@ -16,14 +16,14 @@ import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarGeofence } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
-import { MapPinned, Plus, Trash2, Edit3, X, Save, Circle, Square } from 'lucide-react-native';
+import { MapPinned, Plus, Trash2, Edit3, X, Save, Square, RectangleHorizontal } from 'lucide-react-native';
 
 interface GeofenceScreenProps {
   deviceId: number;
   onClose?: () => void;
 }
 
-type DrawingMode = 'none' | 'polygon' | 'circle';
+type DrawingMode = 'none' | 'polygon' | 'rectangle';
 
 export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClose }) => {
   const [device, setDevice] = useState<TraccarDevice | null>(null);
@@ -66,16 +66,22 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     loadData();
   }, [deviceId]);
 
+  const [showShapeSelector, setShowShapeSelector] = useState(false);
+
   const handleCreateGeofence = () => {
-    // Don't show modal yet - let user draw first
-    setDrawingMode('polygon');
+    // Show shape selector first
+    setShowShapeSelector(true);
+  };
+
+  const handleShapeSelect = (shape: DrawingMode) => {
+    setDrawingMode(shape);
     setGeofenceName('');
     setGeofenceDescription('');
     setDrawnArea(null);
     setEditingGeofence(null);
-    setSelectedGeofenceId(null); // Clear selection
-    setMapCenter(mapCenter || { latitude: 37.7749, longitude: -122.4194 }); // Keep current center
-    setShowEditModal(false); // Keep modal closed while drawing
+    setSelectedGeofenceId(null);
+    setShowShapeSelector(false);
+    setShowEditModal(false);
   };
 
   const zoomToGeofence = (geofence: TraccarGeofence) => {
@@ -259,6 +265,56 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
         )}
       </View>
 
+      <Modal
+        visible={showShapeSelector}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowShapeSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <GlassCard style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Shape Type</Text>
+              <TouchableOpacity onPress={() => setShowShapeSelector(false)}>
+                <X color={colors.text.primary} size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.shapeSelectorContainer}>
+              <Text style={styles.shapeSelectorHint}>
+                Choose the shape type for your geofence
+              </Text>
+              
+              <TouchableOpacity
+                style={styles.shapeOption}
+                onPress={() => handleShapeSelect('polygon')}
+              >
+                <Square color={colors.primary} size={32} />
+                <View style={styles.shapeOptionText}>
+                  <Text style={styles.shapeOptionTitle}>Polygon</Text>
+                  <Text style={styles.shapeOptionDescription}>
+                    Draw a custom polygon shape by tapping points on the map
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.shapeOption}
+                onPress={() => handleShapeSelect('rectangle')}
+              >
+                <RectangleHorizontal color={colors.primary} size={32} />
+                <View style={styles.shapeOptionText}>
+                  <Text style={styles.shapeOptionTitle}>Rectangle</Text>
+                  <Text style={styles.shapeOptionDescription}>
+                    Draw a rectangle by clicking and dragging on the map
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+        </View>
+      </Modal>
+
       <View style={styles.mapContainer}>
         <WebMapView
           key={`map-${selectedGeofenceId}-${mapCenter?.latitude}-${mapCenter?.longitude}-${drawingMode}`}
@@ -279,7 +335,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
               <Text style={styles.drawingHintText}>
                 {drawingMode === 'polygon' 
                   ? '📍 Tap on map to add points\nDouble-tap to finish' 
-                  : '⭕ Click and drag to draw circle'}
+                  : '▭ Click and drag to draw rectangle'}
               </Text>
               <TouchableOpacity 
                 style={styles.cancelDrawingButton}
@@ -437,21 +493,21 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                     <TouchableOpacity
                       style={[
                         styles.drawingModeButton,
-                        drawingMode === 'circle' && styles.drawingModeButtonActive,
+                        drawingMode === 'rectangle' && styles.drawingModeButtonActive,
                       ]}
                       onPress={() => {
-                        setDrawingMode('circle');
+                        setDrawingMode('rectangle');
                         setShowEditModal(false);
                       }}
                     >
-                      <Circle color={drawingMode === 'circle' ? colors.primary : colors.text.secondary} size={20} />
+                      <RectangleHorizontal color={drawingMode === 'rectangle' ? colors.primary : colors.text.secondary} size={20} />
                       <Text
                         style={[
                           styles.drawingModeText,
-                          drawingMode === 'circle' && styles.drawingModeTextActive,
+                          drawingMode === 'rectangle' && styles.drawingModeTextActive,
                         ]}
                       >
-                        Circle
+                        Rectangle
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -789,5 +845,37 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.primary,
     fontWeight: '700',
+  },
+  shapeSelectorContainer: {
+    gap: 16,
+  },
+  shapeSelectorHint: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  shapeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    gap: 16,
+  },
+  shapeOptionText: {
+    flex: 1,
+  },
+  shapeOptionTitle: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  shapeOptionDescription: {
+    ...typography.small,
+    color: colors.text.secondary,
   },
 });

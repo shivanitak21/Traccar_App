@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,14 +8,17 @@ import {
   Dimensions,
   Alert,
   Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
-import { Play, Pause, SkipBack, SkipForward, X, Calendar, Filter } from 'lucide-react-native';
+import { Play, Pause, SkipBack, SkipForward, X, Calendar, Filter, Clock } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,17 +38,87 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [customFromDate, setCustomFromDate] = useState<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const [customToDate, setCustomToDate] = useState<Date>(new Date());
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+  const [showToDatePicker, setShowToDatePicker] = useState(false);
+  const [showFromTimePicker, setShowFromTimePicker] = useState(false);
+  const [showToTimePicker, setShowToTimePicker] = useState(false);
   const playbackInterval = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTime = useRef<number>(0);
+  const mapCenterUpdateThrottle = useRef<number>(0);
 
-  const loadRoute = async (filter: TimeFilter = timeFilter) => {
+  // Memoize polylines to prevent unnecessary recalculations - MUST be before early returns
+  const polylines = useMemo(() => {
+    if (route.length === 0 || currentIndex < 0) return [];
+    const result: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
+    
+    if (currentIndex > 0) {
+      const pastCoordinates = route.slice(0, currentIndex + 1).map(p => ({
+        latitude: p.latitude,
+        longitude: p.longitude,
+      }));
+      
+      if (pastCoordinates.length > 1) {
+        result.push({
+          coordinates: pastCoordinates,
+          color: '#1a1a2e',
+          width: 5,
+        });
+      }
+    }
+    
+    if (currentIndex < route.length - 1) {
+      const futureCoordinates = route.slice(currentIndex).map(p => ({
+        latitude: p.latitude,
+        longitude: p.longitude,
+      }));
+      
+      if (futureCoordinates.length > 1) {
+        result.push({
+          coordinates: futureCoordinates,
+          color: '#0d0d1a',
+          width: 3,
+        });
+      }
+    }
+    
+    return result;
+  }, [route, currentIndex]);
+
+  // Calculate current position and markers - MUST be before early returns
+  const currentPosition = useMemo(() => {
+    return route.length > 0 && currentIndex >= 0 ? route[currentIndex] : null;
+  }, [route, currentIndex]);
+
+  const speed = useMemo(() => {
+    return currentPosition ? Math.round(currentPosition.speed * 1.852) : 0;
+  }, [currentPosition]);
+
+  // Single vehicle marker at current position
+  const markers = useMemo(() => {
+    return currentPosition ? [
+      {
+        id: 'current',
+        latitude: currentPosition.latitude,
+        longitude: currentPosition.longitude,
+        title: device?.name || 'Device',
+        description: `${speed} km/h • ${new Date(currentPosition.fixTime).toLocaleTimeString()}`,
+        color: colors.primary,
+        status: 'online',
+      },
+    ] : [];
+  }, [currentPosition, device, speed]);
+
+  const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
       const deviceData = await traccarAPI.getDevice(deviceId);
       setDevice(deviceData);
 
-      const to = new Date();
-      let from = new Date();
+      const to = toDate || new Date();
+      let from = fromDate || new Date();
 
       switch (filter) {
         case '24h':
@@ -58,8 +131,8 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
           break;
         case 'custom':
-          // For custom, use last 24h as default, user can extend later
-          from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+          // Use provided custom dates
+          from = fromDate || customFromDate;
           break;
       }
 
@@ -88,7 +161,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     } finally {
       setLoading(false);
     }
-  };
+  }, [deviceId, timeFilter, customFromDate]);
 
   useEffect(() => {
     loadRoute();
@@ -102,9 +175,9 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
 
   useEffect(() => {
     if (isPlaying && route.length > 0) {
-      // Calculate playback speed to complete in 10-20 seconds
-      const totalDuration = 15000; // 15 seconds
-      const intervalTime = Math.max(100, Math.floor(totalDuration / route.length)); // Min 100ms for smoothness
+      // Calculate playback speed to complete in 15 seconds
+      const totalDuration = 15000;
+      const intervalTime = Math.max(100, Math.floor(totalDuration / route.length));
       
       playbackInterval.current = setInterval(() => {
         setCurrentIndex(prev => {
@@ -128,27 +201,23 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     };
   }, [isPlaying, route.length]);
   
-  // Separate effect for map center updates to prevent blinking
+  // Optimized map center updates - only update every 10 points or when paused to prevent blinking
   useEffect(() => {
-    if (route.length > 0 && currentIndex % 20 === 0) {
+    if (route.length > 0) {
       const currentPosition = route[currentIndex];
       if (currentPosition) {
-        setMapCenter({
-          latitude: currentPosition.latitude,
-          longitude: currentPosition.longitude,
-        });
+        const now = Date.now();
+        // Throttle updates: only update every 500ms when playing, or immediately when paused
+        if (!isPlaying || (now - mapCenterUpdateThrottle.current > 500)) {
+          mapCenterUpdateThrottle.current = now;
+          setMapCenter({
+            latitude: currentPosition.latitude,
+            longitude: currentPosition.longitude,
+          });
+        }
       }
     }
-  }, [currentIndex, route.length]);
-
-  useEffect(() => {
-    if (route.length > 0 && !isPlaying) {
-      const currentPosition = route[currentIndex];
-      if (currentPosition) {
-        setMapCenter({ latitude: currentPosition.latitude, longitude: currentPosition.longitude });
-      }
-    }
-  }, [currentIndex, route.length]);
+  }, [currentIndex, route.length, isPlaying]);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -172,7 +241,37 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   const handleFilterChange = (filter: TimeFilter) => {
     setTimeFilter(filter);
     setShowFilterModal(false);
-    loadRoute(filter);
+    if (filter === 'custom') {
+      setShowCustomDatePicker(true);
+    } else {
+      loadRoute(filter);
+    }
+  };
+
+  const handleCustomDateApply = () => {
+    if (customFromDate >= customToDate) {
+      Alert.alert('Error', 'Start date must be before end date');
+      return;
+    }
+    setShowCustomDatePicker(false);
+    setShowFilterModal(false);
+    loadRoute('custom', customFromDate, customToDate);
+  };
+
+  const formatDateTime = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  };
+
+  const parseDateTime = (value: string): Date => {
+    const [datePart, timePart] = value.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart ? timePart.split(':').map(Number) : [0, 0];
+    return new Date(year, month - 1, day, hours, minutes);
   };
 
   const getSpeedColor = (speed: number) => {
@@ -224,58 +323,6 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
         </View>
       </View>
     );
-  }
-
-  const currentPosition = route[currentIndex];
-  const speed = currentPosition ? Math.round(currentPosition.speed * 1.852) : 0;
-
-  // Single vehicle marker at current position
-  const markers = [
-    {
-      id: 'current',
-      latitude: currentPosition.latitude,
-      longitude: currentPosition.longitude,
-      title: device?.name || 'Device',
-      description: `${speed} km/h • ${new Date(currentPosition.fixTime).toLocaleTimeString()}`,
-      color: colors.primary,
-      status: 'online',
-    },
-  ];
-
-  // Build complete route polyline with color coding
-  // Show complete route from start to current position as a single polyline for smoothness
-  const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
-  
-  if (currentIndex > 0) {
-    // Draw past route (from start to current) in dark gray
-    const pastCoordinates = route.slice(0, currentIndex + 1).map(p => ({
-      latitude: p.latitude,
-      longitude: p.longitude,
-    }));
-    
-    if (pastCoordinates.length > 1) {
-      polylines.push({
-        coordinates: pastCoordinates,
-        color: '#1a1a2e', // Dark color for past route
-        width: 5,
-      });
-    }
-  }
-  
-  // Draw remaining route in very dark gray to show path ahead
-  if (currentIndex < route.length - 1) {
-    const futureCoordinates = route.slice(currentIndex).map(p => ({
-      latitude: p.latitude,
-      longitude: p.longitude,
-    }));
-    
-    if (futureCoordinates.length > 1) {
-      polylines.push({
-        coordinates: futureCoordinates,
-        color: '#0d0d1a', // Very dark color for future route
-        width: 3,
-      });
-    }
   }
 
   return (
@@ -380,7 +427,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
             </View>
 
             <View style={styles.filterOptions}>
-              {(['24h', '7d', '30d'] as TimeFilter[]).map((filter) => (
+              {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
                 <TouchableOpacity
                   key={filter}
                   style={[
@@ -400,6 +447,134 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
                 </TouchableOpacity>
               ))}
             </View>
+          </GlassCard>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCustomDatePicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCustomDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <GlassCard style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Custom Date Range</Text>
+              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+                <X color={colors.text.primary} size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.dateLabel}>From Date & Time</Text>
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowFromDatePicker(true)}
+                >
+                  <Calendar color={colors.primary} size={20} />
+                  <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.timeButton}
+                  onPress={() => setShowFromTimePicker(true)}
+                >
+                  <Clock color={colors.primary} size={20} />
+                  <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowToDatePicker(true)}
+                >
+                  <Calendar color={colors.primary} size={20} />
+                  <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.timeButton}
+                  onPress={() => setShowToTimePicker(true)}
+                >
+                  <Clock color={colors.primary} size={20} />
+                  <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+                <Text style={styles.applyButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showFromDatePicker && (
+              <DateTimePicker
+                value={customFromDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowFromDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    const newDate = new Date(selectedDate);
+                    newDate.setHours(customFromDate.getHours());
+                    newDate.setMinutes(customFromDate.getMinutes());
+                    setCustomFromDate(newDate);
+                  }
+                }}
+              />
+            )}
+
+            {showToDatePicker && (
+              <DateTimePicker
+                value={customToDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowToDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    const newDate = new Date(selectedDate);
+                    newDate.setHours(customToDate.getHours());
+                    newDate.setMinutes(customToDate.getMinutes());
+                    setCustomToDate(newDate);
+                  }
+                }}
+              />
+            )}
+
+            {showFromTimePicker && (
+              <DateTimePicker
+                value={customFromDate}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowFromTimePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    const newDate = new Date(customFromDate);
+                    newDate.setHours(selectedDate.getHours());
+                    newDate.setMinutes(selectedDate.getMinutes());
+                    setCustomFromDate(newDate);
+                  }
+                }}
+              />
+            )}
+
+            {showToTimePicker && (
+              <DateTimePicker
+                value={customToDate}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowToTimePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    const newDate = new Date(customToDate);
+                    newDate.setHours(selectedDate.getHours());
+                    newDate.setMinutes(selectedDate.getMinutes());
+                    setCustomToDate(newDate);
+                  }
+                }}
+              />
+            )}
           </GlassCard>
         </View>
       </Modal>
@@ -584,5 +759,59 @@ const styles = StyleSheet.create({
   filterOptionTextActive: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  datePickerContainer: {
+    gap: 12,
+  },
+  dateLabel: {
+    ...typography.small,
+    color: colors.text.secondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  timeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  dateButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  applyButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  applyButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '700',
   },
 });

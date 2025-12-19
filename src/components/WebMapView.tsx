@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -21,7 +21,7 @@ interface Polyline {
 }
 
 export type MapLayerType = 'normal' | 'satellite' | 'terrain' | 'hybrid';
-export type DrawingMode = 'none' | 'polygon' | 'circle';
+export type DrawingMode = 'none' | 'polygon' | 'rectangle';
 
 interface WebMapViewProps {
   markers?: Marker[];
@@ -44,7 +44,7 @@ interface WebMapViewProps {
   style?: any;
 }
 
-export const WebMapView: React.FC<WebMapViewProps> = ({
+export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
   markers = [],
   polylines = [],
   center = { latitude: 0, longitude: 0 },
@@ -60,28 +60,56 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
   style,
 }) => {
   const webViewRef = useRef<WebView>(null);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Memoize map data to prevent unnecessary updates
+  const mapData = useMemo(() => ({
+    markers,
+    polylines,
+    center,
+    zoom,
+    mapLayer,
+    geofences,
+    selectedGeofenceId,
+    drawingMode,
+  }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode]);
+
+  const updateMap = useCallback(() => {
+    if (webViewRef.current) {
+      // Clear any pending updates
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      
+      // Throttle updates to prevent excessive re-renders
+      updateTimeoutRef.current = setTimeout(() => {
+        if (webViewRef.current) {
+          const script = `
+            if (window.updateMapData) {
+              window.updateMapData(${JSON.stringify(mapData)});
+            }
+            true;
+          `;
+          webViewRef.current.injectJavaScript(script);
+        }
+      }, 50);
+    }
+  }, [mapData]);
 
   useEffect(() => {
     // Small delay to ensure WebView is ready
     const timer = setTimeout(() => {
       updateMap();
     }, 100);
-    return () => clearTimeout(timer);
-  }, [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode]);
+    return () => {
+      clearTimeout(timer);
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [updateMap]);
 
-  const updateMap = () => {
-    if (webViewRef.current) {
-      const script = `
-        if (window.updateMapData) {
-          window.updateMapData(${JSON.stringify({ markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode })});
-        }
-        true;
-      `;
-      webViewRef.current.injectJavaScript(script);
-    }
-  };
-
-  const handleMessage = (event: any) => {
+  const handleMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'markerPress' && onMarkerPress) {
@@ -94,7 +122,7 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
     } catch (error) {
       console.error('Error parsing WebView message:', error);
     }
-  };
+  }, [onMarkerPress, onGeofencePress, onGeofenceDrawn]);
 
   const html = `
 <!DOCTYPE html>
@@ -490,26 +518,41 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
             area: area
           }));
         });
-      } else if (mode === 'circle') {
-        const circle = new L.Draw.Circle(map);
-        circle.enable();
-        
-        map.on('draw:created', function(e) {
-          const layer = e.layer;
-          drawnItems.clearLayers();
-          drawnItems.addLayer(layer);
-          
-          // Convert to Traccar format
-          const center = layer.getLatLng();
-          const radius = layer.getRadius();
-          const area = 'CIRCLE (' + center.lat + ' ' + center.lng + ' ' + Math.round(radius) + ')';
-          
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'geofenceDrawn',
-            area: area
-          }));
-        });
-      }
+       } else if (mode === 'rectangle') {
+         const rectangle = new L.Draw.Rectangle(map);
+         rectangle.enable();
+         
+         map.on('draw:created', function(e) {
+           const layer = e.layer;
+           drawnItems.clearLayers();
+           drawnItems.addLayer(layer);
+           
+           // Convert rectangle to Traccar POLYGON format
+           // Get the bounds of the rectangle
+           const bounds = layer.getBounds();
+           const sw = bounds.getSouthWest(); // Southwest corner
+           const ne = bounds.getNorthEast(); // Northeast corner
+           const se = bounds.getSouthEast(); // Southeast corner
+           const nw = bounds.getNorthWest(); // Northwest corner
+           
+           // Create polygon coordinates in clockwise order: SW -> SE -> NE -> NW -> SW (closed)
+           // Format: POLYGON ((lat1 lon1, lat2 lon2, lat3 lon3, lat4 lon4, lat1 lon1))
+           const coords = [
+             sw.lat + ' ' + sw.lng,  // Southwest
+             se.lat + ' ' + se.lng,  // Southeast
+             ne.lat + ' ' + ne.lng,  // Northeast
+             nw.lat + ' ' + nw.lng,  // Northwest
+             sw.lat + ' ' + sw.lng   // Close the polygon
+           ].join(', ');
+           
+           const area = 'POLYGON ((' + coords + '))';
+           
+           window.ReactNativeWebView.postMessage(JSON.stringify({
+             type: 'geofenceDrawn',
+             area: area
+           }));
+         });
+       }
     }
     
     function disableDrawing() {
@@ -536,7 +579,41 @@ export const WebMapView: React.FC<WebMapViewProps> = ({
       />
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  // Compare arrays by length and key properties
+  const markersEqual = prevProps.markers?.length === nextProps.markers?.length &&
+    (!prevProps.markers || !nextProps.markers || 
+     prevProps.markers.every((m, i) => 
+       m.id === nextProps.markers![i].id &&
+       m.latitude === nextProps.markers![i].latitude &&
+       m.longitude === nextProps.markers![i].longitude
+     ));
+  
+  const polylinesEqual = prevProps.polylines?.length === nextProps.polylines?.length &&
+    (!prevProps.polylines || !nextProps.polylines ||
+     prevProps.polylines.every((p, i) => 
+       p.coordinates.length === nextProps.polylines![i].coordinates.length
+     ));
+  
+  const geofencesEqual = prevProps.geofences?.length === nextProps.geofences?.length &&
+    (!prevProps.geofences || !nextProps.geofences ||
+     prevProps.geofences.every((g, i) => 
+       g.id === nextProps.geofences![i].id
+     ));
+
+  return (
+    markersEqual &&
+    polylinesEqual &&
+    prevProps.center?.latitude === nextProps.center?.latitude &&
+    prevProps.center?.longitude === nextProps.center?.longitude &&
+    prevProps.zoom === nextProps.zoom &&
+    prevProps.mapLayer === nextProps.mapLayer &&
+    geofencesEqual &&
+    prevProps.selectedGeofenceId === nextProps.selectedGeofenceId &&
+    prevProps.drawingMode === nextProps.drawingMode
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

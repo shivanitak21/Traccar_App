@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,14 +7,18 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  TextInput,
+  Platform,
+  Alert,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
-import { Calendar, Clock, Navigation, MapPin, X, Filter } from 'lucide-react-native';
+import { Calendar, Clock, Navigation, MapPin, X, Filter, Eye } from 'lucide-react-native';
 
 interface RouteHistoryScreenProps {
   deviceId: number;
@@ -33,14 +37,29 @@ interface RouteStats {
   toTime: Date;
 }
 
+interface RouteSegment {
+  fromTime: Date;
+  toTime: Date;
+  distance: number; // km
+  positions: TraccarPosition[];
+}
+
 export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId, onClose }) => {
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [route, setRoute] = useState<TraccarPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number | null>(null);
+  const [selectedRouteSegment, setSelectedRouteSegment] = useState<RouteSegment | null>(null);
   const [stats, setStats] = useState<RouteStats | null>(null);
+  const [customFromDate, setCustomFromDate] = useState<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const [customToDate, setCustomToDate] = useState<Date>(new Date());
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+  const [showToDatePicker, setShowToDatePicker] = useState(false);
+  const [showFromTimePicker, setShowFromTimePicker] = useState(false);
+  const [showToTimePicker, setShowToTimePicker] = useState(false);
+  const [showRouteOnMap, setShowRouteOnMap] = useState(false);
 
   const calculateStats = (positions: TraccarPosition[]): RouteStats => {
     if (positions.length === 0) {
@@ -115,14 +134,14 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     };
   };
 
-  const loadRoute = async (filter: TimeFilter = timeFilter) => {
+  const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
       const deviceData = await traccarAPI.getDevice(deviceId);
       setDevice(deviceData);
 
-      const to = new Date();
-      let from = new Date();
+      const to = toDate || new Date();
+      let from = fromDate || new Date();
 
       switch (filter) {
         case '24h':
@@ -135,7 +154,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
           break;
         case 'custom':
-          from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+          from = fromDate || customFromDate;
           break;
       }
 
@@ -158,7 +177,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     } finally {
       setLoading(false);
     }
-  };
+  }, [deviceId, timeFilter, customFromDate]);
 
   useEffect(() => {
     loadRoute();
@@ -167,8 +186,91 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const handleFilterChange = (filter: TimeFilter) => {
     setTimeFilter(filter);
     setShowFilterModal(false);
-    loadRoute(filter);
+    if (filter === 'custom') {
+      setShowCustomDatePicker(true);
+    } else {
+      loadRoute(filter);
+    }
   };
+
+  const handleCustomDateApply = () => {
+    if (customFromDate >= customToDate) {
+      Alert.alert('Error', 'Start date must be before end date');
+      return;
+    }
+    setShowCustomDatePicker(false);
+    setShowFilterModal(false);
+    loadRoute('custom', customFromDate, customToDate);
+  };
+
+  const formatDateTime = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  };
+
+  const parseDateTime = (value: string): Date => {
+    const [datePart, timePart] = value.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart ? timePart.split(':').map(Number) : [0, 0];
+    return new Date(year, month - 1, day, hours, minutes);
+  };
+
+  // Group route into segments by day for better display
+  const routeSegments = useMemo(() => {
+    if (route.length === 0) return [];
+
+    const segments: RouteSegment[] = [];
+    let currentSegment: RouteSegment | null = null;
+
+    route.forEach((position, index) => {
+      const positionDate = new Date(position.fixTime);
+      const positionDay = positionDate.toDateString();
+
+      if (!currentSegment || new Date(currentSegment.fromTime).toDateString() !== positionDay) {
+        // Start new segment
+        if (currentSegment) {
+          segments.push(currentSegment);
+        }
+        currentSegment = {
+          fromTime: positionDate,
+          toTime: positionDate,
+          distance: 0,
+          positions: [position],
+        };
+      } else {
+        // Add to current segment
+        currentSegment.positions.push(position);
+        currentSegment.toTime = positionDate;
+
+        // Calculate distance from previous point in the segment
+        if (currentSegment.positions.length > 1) {
+          const prevPos = currentSegment.positions[currentSegment.positions.length - 2];
+          const R = 6371; // Earth radius in km
+          const dLat = ((position.latitude - prevPos.latitude) * Math.PI) / 180;
+          const dLon = ((position.longitude - prevPos.longitude) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((prevPos.latitude * Math.PI) / 180) *
+              Math.cos((position.latitude * Math.PI) / 180) *
+              Math.sin(dLon / 2) *
+              Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          currentSegment.distance += distance;
+        }
+      }
+    });
+
+    if (currentSegment) {
+      segments.push(currentSegment);
+    }
+
+    return segments;
+  }, [route]);
 
   const getFilterLabel = (filter: TimeFilter) => {
     switch (filter) {
@@ -194,21 +296,21 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     return `${mins}m`;
   };
 
-  const getRoutePolylines = () => {
-    if (route.length < 2) return [];
+  const getRoutePolylines = useCallback((positions: TraccarPosition[]) => {
+    if (positions.length < 2) return [];
 
     const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
 
-    for (let i = 0; i < route.length - 1; i++) {
-      const speed = route[i].speed * 1.852;
+    for (let i = 0; i < positions.length - 1; i++) {
+      const speed = positions[i].speed * 1.852;
       let color = colors.success;
       if (speed > 60) color = colors.error;
       else if (speed > 20) color = colors.warning;
 
       polylines.push({
         coordinates: [
-          { latitude: route[i].latitude, longitude: route[i].longitude },
-          { latitude: route[i + 1].latitude, longitude: route[i + 1].longitude },
+          { latitude: positions[i].latitude, longitude: positions[i].longitude },
+          { latitude: positions[i + 1].latitude, longitude: positions[i + 1].longitude },
         ],
         color,
         width: 4,
@@ -216,15 +318,20 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     }
 
     return polylines;
-  };
+  }, []);
 
-  const getMapCenter = () => {
-    if (route.length === 0) return { latitude: 0, longitude: 0 };
-    const centerIndex = Math.floor(route.length / 2);
+  const getMapCenter = useCallback((positions: TraccarPosition[]) => {
+    if (positions.length === 0) return { latitude: 0, longitude: 0 };
+    const centerIndex = Math.floor(positions.length / 2);
     return {
-      latitude: route[centerIndex].latitude,
-      longitude: route[centerIndex].longitude,
+      latitude: positions[centerIndex].latitude,
+      longitude: positions[centerIndex].longitude,
     };
+  }, []);
+
+  const handleViewRoute = (segment: RouteSegment) => {
+    setSelectedRouteSegment(segment);
+    setShowRouteOnMap(true);
   };
 
   if (loading) {
@@ -238,12 +345,6 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
 
   return (
     <LinearGradient colors={colors.gradient.dark} style={styles.container}>
-      {onClose && (
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <X color={colors.text.primary} size={24} />
-        </TouchableOpacity>
-      )}
-
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Navigation color={colors.primary} size={32} />
@@ -253,9 +354,16 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           </View>
         </View>
 
-        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
-          <Filter color={colors.text.primary} size={20} />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
+            <Filter color={colors.text.primary} size={20} />
+          </TouchableOpacity>
+          {onClose && (
+            <TouchableOpacity style={styles.closeButtonHeader} onPress={onClose}>
+              <X color={colors.text.primary} size={20} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {route.length === 0 ? (
@@ -266,15 +374,33 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
         </View>
       ) : (
         <>
-          <View style={styles.mapContainer}>
-            <WebMapView
-              markers={[]}
-              polylines={getRoutePolylines()}
-              center={getMapCenter()}
-              zoom={13}
-              style={styles.map}
-            />
-          </View>
+          {showRouteOnMap && selectedRouteSegment ? (
+            <View style={styles.mapContainer}>
+              <WebMapView
+                markers={[]}
+                polylines={getRoutePolylines(selectedRouteSegment.positions)}
+                center={getMapCenter(selectedRouteSegment.positions)}
+                zoom={13}
+                style={styles.map}
+              />
+              <TouchableOpacity
+                style={styles.closeMapButton}
+                onPress={() => setShowRouteOnMap(false)}
+              >
+                <X color={colors.text.primary} size={20} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.mapContainer}>
+              <WebMapView
+                markers={[]}
+                polylines={getRoutePolylines(route)}
+                center={getMapCenter(route)}
+                zoom={13}
+                style={styles.map}
+              />
+            </View>
+          )}
 
           {stats && (
             <View style={styles.statsContainer}>
@@ -314,34 +440,37 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
             </View>
           )}
 
-          <ScrollView style={styles.listContainer} contentContainerStyle={styles.listContent}>
-            <Text style={styles.listTitle}>Route Points ({route.length})</Text>
-            {route.map((position, index) => (
+          <ScrollView 
+            style={styles.listContainer} 
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <Text style={styles.listTitle}>Route History ({routeSegments.length} segments)</Text>
+            {routeSegments.map((segment, index) => (
               <GlassCard key={index} style={styles.routeItem}>
                 <View style={styles.routeItemHeader}>
                   <View style={styles.routeItemIcon}>
-                    <MapPin color={colors.primary} size={20} />
+                    <Navigation color={colors.primary} size={20} />
                   </View>
                   <View style={styles.routeItemInfo}>
                     <Text style={styles.routeItemTime}>
-                      {new Date(position.fixTime).toLocaleString()}
+                      {segment.fromTime.toLocaleDateString()} {segment.fromTime.toLocaleTimeString()} - {segment.toTime.toLocaleTimeString()}
                     </Text>
-                    <Text style={styles.routeItemSpeed}>
-                      {Math.round(position.speed * 1.852)} km/h
+                    <Text style={styles.routeItemDistance}>
+                      Distance: {segment.distance.toFixed(2)} km
+                    </Text>
+                    <Text style={styles.routeItemPoints}>
+                      {segment.positions.length} points
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.viewButton}
-                    onPress={() => {
-                      setSelectedRouteIndex(index);
-                    }}
+                    onPress={() => handleViewRoute(segment)}
                   >
+                    <Eye color={colors.primary} size={18} />
                     <Text style={styles.viewButtonText}>View</Text>
                   </TouchableOpacity>
                 </View>
-                {position.address && (
-                  <Text style={styles.routeItemAddress}>{position.address}</Text>
-                )}
               </GlassCard>
             ))}
           </ScrollView>
@@ -364,7 +493,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
             </View>
 
             <View style={styles.filterOptions}>
-              {(['24h', '7d', '30d'] as TimeFilter[]).map((filter) => (
+              {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
                 <TouchableOpacity
                   key={filter}
                   style={[
@@ -388,43 +517,135 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
         </View>
       </Modal>
 
-      {selectedRouteIndex !== null && (
-        <Modal
-          visible={selectedRouteIndex !== null}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setSelectedRouteIndex(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <GlassCard style={styles.mapModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Route Point Details</Text>
-                <TouchableOpacity onPress={() => setSelectedRouteIndex(null)}>
-                  <X color={colors.text.primary} size={24} />
+      <Modal
+        visible={showCustomDatePicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCustomDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <GlassCard style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Custom Date Range</Text>
+              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+                <X color={colors.text.primary} size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.datePickerScrollView}>
+              <View style={styles.datePickerContainer}>
+                <Text style={styles.dateLabel}>From Date & Time</Text>
+                <View style={styles.dateRow}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowFromDatePicker(true)}
+                  >
+                    <Calendar color={colors.primary} size={20} />
+                    <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={() => setShowFromTimePicker(true)}
+                  >
+                    <Clock color={colors.primary} size={20} />
+                    <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
+                <View style={styles.dateRow}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowToDatePicker(true)}
+                  >
+                    <Calendar color={colors.primary} size={20} />
+                    <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={() => setShowToTimePicker(true)}
+                  >
+                    <Clock color={colors.primary} size={20} />
+                    <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+                  <Text style={styles.applyButtonText}>Apply</Text>
                 </TouchableOpacity>
               </View>
-              <WebMapView
-                markers={[
-                  {
-                    id: 'selected',
-                    latitude: route[selectedRouteIndex].latitude,
-                    longitude: route[selectedRouteIndex].longitude,
-                    title: 'Selected Point',
-                    description: new Date(route[selectedRouteIndex].fixTime).toLocaleString(),
-                    color: colors.primary,
-                  },
-                ]}
-                center={{
-                  latitude: route[selectedRouteIndex].latitude,
-                  longitude: route[selectedRouteIndex].longitude,
-                }}
-                zoom={15}
-                style={styles.modalMap}
-              />
-            </GlassCard>
-          </View>
-        </Modal>
-      )}
+
+              {showFromDatePicker && (
+                <DateTimePicker
+                  value={customFromDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowFromDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const newDate = new Date(selectedDate);
+                      newDate.setHours(customFromDate.getHours());
+                      newDate.setMinutes(customFromDate.getMinutes());
+                      setCustomFromDate(newDate);
+                    }
+                  }}
+                />
+              )}
+
+              {showToDatePicker && (
+                <DateTimePicker
+                  value={customToDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowToDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const newDate = new Date(selectedDate);
+                      newDate.setHours(customToDate.getHours());
+                      newDate.setMinutes(customToDate.getMinutes());
+                      setCustomToDate(newDate);
+                    }
+                  }}
+                />
+              )}
+
+              {showFromTimePicker && (
+                <DateTimePicker
+                  value={customFromDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowFromTimePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const newDate = new Date(customFromDate);
+                      newDate.setHours(selectedDate.getHours());
+                      newDate.setMinutes(selectedDate.getMinutes());
+                      setCustomFromDate(newDate);
+                    }
+                  }}
+                />
+              )}
+
+              {showToTimePicker && (
+                <DateTimePicker
+                  value={customToDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowToTimePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const newDate = new Date(customToDate);
+                      newDate.setHours(selectedDate.getHours());
+                      newDate.setMinutes(selectedDate.getMinutes());
+                      setCustomToDate(newDate);
+                    }
+                  }}
+                />
+              )}
+            </ScrollView>
+          </GlassCard>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 };
@@ -444,20 +665,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 16,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,6 +681,11 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     flex: 1,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   title: {
     ...typography.h2,
     color: colors.text.primary,
@@ -485,6 +697,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.glass.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+  },
+  closeButtonHeader: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -593,28 +815,103 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
-  routeItemSpeed: {
-    ...typography.small,
-    color: colors.text.secondary,
+  routeItemDistance: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '700',
+    marginTop: 4,
   },
-  routeItemAddress: {
+  routeItemPoints: {
     ...typography.small,
     color: colors.text.tertiary,
-    marginTop: 8,
-    fontStyle: 'italic',
+    marginTop: 4,
   },
   viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: colors.primaryGlow,
     borderWidth: 1,
     borderColor: colors.primary,
+    gap: 6,
   },
   viewButtonText: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '600',
+  },
+  closeMapButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.glass.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    zIndex: 10,
+  },
+  datePickerScrollView: {
+    maxHeight: 400,
+  },
+  datePickerContainer: {
+    gap: 12,
+  },
+  dateLabel: {
+    ...typography.small,
+    color: colors.text.secondary,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  timeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  dateButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  applyButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  applyButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '700',
   },
   emptyContainer: {
     flex: 1,
