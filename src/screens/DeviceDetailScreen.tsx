@@ -11,7 +11,9 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
-import { Car, MapPin, Clock, Activity, Gauge } from 'lucide-react-native';
+import { Navigation, MapPin, Clock, Activity, Gauge } from 'lucide-react-native';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed } from '../utils/units';
 
 interface DeviceDetailScreenProps {
   route: {
@@ -23,6 +25,7 @@ interface DeviceDetailScreenProps {
 
 export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route }) => {
   const { deviceId } = route.params;
+  const { prefs } = usePrefsStore();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +69,7 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
   }
 
   const isOnline = device.status === 'online';
-  const speed = position ? Math.round(position.speed * 1.852) : 0;
+  const speedLabel = position ? formatSpeed(position.speed, prefs.speedUnit) : formatSpeed(0, prefs.speedUnit);
 
   return (
     <LinearGradient colors={colors.gradient.dark} style={styles.container}>
@@ -74,7 +77,7 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
         <View>
           <GlassCard gradient style={styles.headerCard}>
             <View style={styles.iconContainer}>
-              <Car color={colors.primary} size={40} />
+              <Navigation color={colors.primary} size={40} strokeWidth={1.5} />
             </View>
             <Text style={styles.deviceName}>{device.name}</Text>
             <Text style={styles.uniqueId}>{device.uniqueId}</Text>
@@ -120,7 +123,7 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
                   <Gauge color={colors.primary} size={20} />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Speed</Text>
-                    <Text style={styles.infoValue}>{speed} km/h</Text>
+                    <Text style={styles.infoValue}>{speedLabel}</Text>
                   </View>
                 </View>
                 <View style={styles.infoRow}>

@@ -1,13 +1,13 @@
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { DashboardScreen } from '../../src/screens/DashboardScreen';
-import { SafeAreaView, StyleSheet } from 'react-native';
 import { colors } from '../../src/theme/colors';
 
 export default function DashboardTab() {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <DashboardScreen />
-    </SafeAreaView>
+    </View>
   );
 }
 

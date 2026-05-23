@@ -12,6 +12,8 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed, formatDistance } from '../utils/units';
 import {
   Info,
   Activity,
@@ -32,6 +34,7 @@ interface DeviceInfoScreenProps {
 }
 
 export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, onClose }) => {
+  const { prefs } = usePrefsStore();
   const router = useRouter();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
@@ -175,7 +178,7 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
               <View style={styles.sensorCard}>
                 <Gauge color={colors.success} size={24} />
                 <Text style={styles.sensorLabel}>Speed</Text>
-                <Text style={styles.sensorValue}>{Math.round(position.speed * 1.852)} km/h</Text>
+                <Text style={styles.sensorValue}>{formatSpeed(position.speed, prefs.speedUnit)}</Text>
               </View>
 
               <View style={styles.sensorCard}>

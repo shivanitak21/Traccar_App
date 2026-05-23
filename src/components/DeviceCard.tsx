@@ -4,7 +4,7 @@ import { GlassCard } from './GlassCard';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { TraccarDevice } from '../api/traccar';
-import { Car, Circle, Navigation, Play, MapPinned, Info, Radio } from 'lucide-react-native';
+import { Navigation, Circle, Play, MapPinned, Info, Radio } from 'lucide-react-native';
 import { getVehicleImageUrl } from '../utils/vehicleImages';
 
 interface DeviceCardProps {
@@ -37,14 +37,14 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
       <View style={styles.imageContainer}>
         {imageError ? (
           <View style={[styles.vehicleImage, styles.placeholderContainer]}>
-            <Car color={colors.primary} size={64} />
+            <Navigation color={colors.primary} size={64} strokeWidth={1.5} />
             <Text style={styles.placeholderText}>{device.name}</Text>
           </View>
         ) : (
           <>
             {imageLoading && (
               <View style={[styles.vehicleImage, styles.loadingContainer]}>
-                <Car color={colors.primary} size={48} />
+                <Navigation color={colors.primary} size={48} strokeWidth={1.5} />
               </View>
             )}
             <Image

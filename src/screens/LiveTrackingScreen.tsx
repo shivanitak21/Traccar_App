@@ -7,6 +7,8 @@ import { traccarWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Navigation, Zap, MapPin, X } from 'lucide-react-native';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed } from '../utils/units';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,6 +18,7 @@ interface LiveTrackingScreenProps {
 }
 
 export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId, onClose }) => {
+  const { prefs } = usePrefsStore();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
   const [positionHistory, setPositionHistory] = useState<TraccarPosition[]>([]);
@@ -82,7 +85,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
     );
   }
 
-  const speed = Math.round(position.speed * 1.852);
+  const speedLabel = formatSpeed(position.speed, prefs.speedUnit);
   const pathCoordinates = positionHistory
     .filter(p => p.latitude && p.longitude)
     .map(p => ({
@@ -95,14 +98,17 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
     latitude: position.latitude,
     longitude: position.longitude,
     title: device?.name || 'Unknown Device',
-    description: `${speed} km/h • Live Tracking`,
+    description: `${speedLabel} • Live Tracking`,
     color: colors.primary,
+    status: position.speed > 0 ? 'moving' : 'online',
+    course: position.course || 0,
   }];
 
   const polylines = pathCoordinates.length > 1 ? [{
     coordinates: pathCoordinates,
-    color: colors.primary,
-    width: 3,
+    color: '#10b981',
+    width: 5,
+    opacity: 0.9,
   }] : [];
 
   return (
@@ -118,6 +124,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
         polylines={polylines}
         center={mapCenter || { latitude: position.latitude, longitude: position.longitude }}
         zoom={15}
+        mapLayer="streets"
         showUserLocation={true}
         style={styles.map}
       />
@@ -136,7 +143,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
             <View style={styles.stat}>
               <Zap color={colors.success} size={20} />
               <View>
-                <Text style={styles.statValue}>{speed} km/h</Text>
+                <Text style={styles.statValue}>{speedLabel}</Text>
                 <Text style={styles.statLabel}>Speed</Text>
               </View>
             </View>

@@ -19,6 +19,8 @@ import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Calendar, Clock, Navigation, MapPin, X, Filter, Eye } from 'lucide-react-native';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed, formatDistance } from '../utils/units';
 
 interface RouteHistoryScreenProps {
   deviceId: number;
@@ -45,6 +47,7 @@ interface RouteSegment {
 }
 
 export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId, onClose }) => {
+  const { prefs } = usePrefsStore();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [route, setRoute] = useState<TraccarPosition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -299,11 +302,11 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const getRoutePolylines = useCallback((positions: TraccarPosition[]) => {
     if (positions.length < 2) return [];
 
-    const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
+    const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number; opacity?: number }[] = [];
 
     for (let i = 0; i < positions.length - 1; i++) {
       const speed = positions[i].speed * 1.852;
-      let color = colors.success;
+      let color: string = colors.success;
       if (speed > 60) color = colors.error;
       else if (speed > 20) color = colors.warning;
 
@@ -313,7 +316,8 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           { latitude: positions[i + 1].latitude, longitude: positions[i + 1].longitude },
         ],
         color,
-        width: 4,
+        width: 5,
+        opacity: 0.95,
       });
     }
 
@@ -381,6 +385,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 polylines={getRoutePolylines(selectedRouteSegment.positions)}
                 center={getMapCenter(selectedRouteSegment.positions)}
                 zoom={13}
+                mapLayer="streets"
                 style={styles.map}
               />
               <TouchableOpacity
@@ -397,6 +402,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 polylines={getRoutePolylines(route)}
                 center={getMapCenter(route)}
                 zoom={13}
+                mapLayer="streets"
                 style={styles.map}
               />
             </View>
@@ -409,7 +415,9 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 <View style={styles.statsGrid}>
                   <View style={styles.statItem}>
                     <Navigation color={colors.primary} size={24} />
-                    <Text style={styles.statValue}>{stats.totalDistance} km</Text>
+                    <Text style={styles.statValue}>
+                      {formatDistance(stats.totalDistance * 1000, prefs.distanceUnit)}
+                    </Text>
                     <Text style={styles.statLabel}>Total Distance</Text>
                   </View>
                   <View style={styles.statItem}>
@@ -424,7 +432,9 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                   </View>
                   <View style={styles.statItem}>
                     <Navigation color={colors.error} size={24} />
-                    <Text style={styles.statValue}>{stats.maxSpeed} km/h</Text>
+                    <Text style={styles.statValue}>
+                      {formatSpeed(stats.maxSpeed / 1.852, prefs.speedUnit)}
+                    </Text>
                     <Text style={styles.statLabel}>Max Speed</Text>
                   </View>
                 </View>

@@ -1,4 +1,8 @@
 import { storage } from '../utils/storage';
+import { API_CONFIG } from './config';
+import { normalizeServerUrl } from '../utils/serverUrl';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface TraccarDevice {
   id: number;
@@ -13,6 +17,7 @@ export interface TraccarDevice {
   contact?: string;
   category?: string;
   disabled: boolean;
+  attributes?: Record<string, any>;
 }
 
 export interface TraccarPosition {
@@ -31,7 +36,7 @@ export interface TraccarPosition {
   address?: string;
   accuracy: number;
   network?: any;
-  attributes: any;
+  attributes: Record<string, any>;
 }
 
 export interface TraccarGeofence {
@@ -40,7 +45,7 @@ export interface TraccarGeofence {
   description?: string;
   area: string;
   calendarId?: number;
-  attributes: any;
+  attributes: Record<string, any>;
 }
 
 export interface TraccarEvent {
@@ -51,100 +56,206 @@ export interface TraccarEvent {
   positionId?: number;
   geofenceId?: number;
   maintenanceId?: number;
-  attributes: any;
+  attributes: Record<string, any>;
 }
 
+export interface TraccarUser {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  administrator?: boolean;
+  readonly?: boolean;
+  deviceLimit?: number;
+  userLimit?: number;
+  deviceReadonly?: boolean;
+  disabled?: boolean;
+  expirationTime?: string;
+  attributes?: Record<string, any>;
+}
+
+export interface TraccarTrip {
+  deviceId: number;
+  deviceName: string;
+  maxSpeed: number;
+  averageSpeed: number;
+  distance: number;
+  duration: number;
+  startOdometer: number;
+  endOdometer: number;
+  startTime: string;
+  startAddress?: string;
+  startLat: number;
+  startLon: number;
+  endTime: string;
+  endAddress?: string;
+  endLat: number;
+  endLon: number;
+  driverName?: string;
+  driverUniqueId?: string;
+  spentFuel?: number;
+}
+
+export interface TraccarStop {
+  deviceId: number;
+  deviceName: string;
+  duration: number;
+  startTime: string;
+  address?: string;
+  lat: number;
+  lon: number;
+  endTime: string;
+  spentFuel?: number;
+  engineHours?: number;
+}
+
+export interface TraccarSummary {
+  deviceId: number;
+  deviceName: string;
+  maxSpeed: number;
+  averageSpeed: number;
+  distance: number;
+  startOdometer: number;
+  endOdometer: number;
+  spentFuel?: number;
+  engineHours?: number;
+}
+
+export interface TraccarDriver {
+  id: number;
+  name: string;
+  uniqueId: string;
+  attributes?: Record<string, any>;
+}
+
+export interface TraccarNotification {
+  id: number;
+  type: string;
+  always: boolean;
+  web: boolean;
+  mail: boolean;
+  sms: boolean;
+  calendarId?: number;
+  attributes?: Record<string, any>;
+}
+
+export interface TraccarGroup {
+  id: number;
+  name: string;
+  groupId?: number;
+  attributes?: Record<string, any>;
+}
+
+// ── API Client ─────────────────────────────────────────────────────────────────
+
 class TraccarAPI {
-  private baseUrl: string = '';
+  private baseUrl: string = API_CONFIG.DEFAULT_BASE_URL;
   private authHeader: string = '';
+  private sessionCookie: string = '';
 
   async initialize() {
     const savedUrl = await storage.getServerUrl();
     const savedAuth = await storage.getSession();
+    const savedCookie = await storage.getSessionCookie();
 
-    if (savedUrl) this.baseUrl = savedUrl;
+    this.baseUrl = normalizeServerUrl(savedUrl);
     if (savedAuth) this.authHeader = savedAuth;
+    if (savedCookie) this.sessionCookie = savedCookie;
   }
 
   setBaseUrl(url: string) {
-    this.baseUrl = url.replace(/\/$/, '');
+    this.baseUrl = normalizeServerUrl(url);
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  setSessionCookie(cookie: string) {
+    this.sessionCookie = cookie;
+  }
+
+  private buildReportQuery(deviceId: number, from: string, to: string): string {
+    const params = new URLSearchParams();
+    params.append('deviceId', String(deviceId));
+    params.append('from', from);
+    params.append('to', to);
+    return params.toString();
+  }
+
+  private async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const headers: any = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.authHeader) {
       headers['Authorization'] = this.authHeader;
     }
 
-    console.log('API Request:', { url, method: options.method || 'GET', hasAuth: !!this.authHeader });
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    console.log('API Response:', { status: response.status, ok: response.ok });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('API Error:', error);
-      throw new Error(error || `HTTP ${response.status}`);
+    if (this.sessionCookie) {
+      headers['Cookie'] = this.sessionCookie;
     }
 
-    // Handle empty responses (like DELETE requests)
-    const contentType = response.headers.get('content-type');
+    const response = await fetch(url, { ...options, headers, credentials: 'include' });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+      let message = errorText || `HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed?.message) message = parsed.message;
+      } catch {
+        // keep raw text
+      }
+      throw new Error(message);
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
     const contentLength = response.headers.get('content-length');
-    
-    // If no content or content-length is 0, return null
-    if (contentLength === '0' || !contentType?.includes('application/json')) {
-      console.log('API: Empty or non-JSON response');
-      return null;
+
+    if (contentLength === '0' || !contentType.includes('application/json')) {
+      return null as T;
     }
 
     const text = await response.text();
-    if (!text || text.trim() === '') {
-      console.log('API: Empty response body');
-      return null;
-    }
+    if (!text?.trim()) return null as T;
 
-    const data = JSON.parse(text);
-    console.log('API Data:', data);
-    return data;
+    return JSON.parse(text) as T;
   }
 
-  async login(email: string, password: string) {
-    console.log('Logging in with:', { email, baseUrl: this.baseUrl });
+  // ── Auth ─────────────────────────────────────────────────────────────────────
 
+  async login(email: string, password: string): Promise<TraccarUser> {
     const formData = new URLSearchParams();
     formData.append('email', email);
     formData.append('password', password);
 
     const response = await fetch(`${this.baseUrl}/api/session`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString(),
     });
 
-    console.log('Login response:', { status: response.status, ok: response.ok });
-
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Login error:', error);
       throw new Error('Invalid credentials');
     }
 
-    const user = await response.json();
-    console.log('Login successful:', user);
+    // Capture session cookie for WebSocket auth
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      const jsessionid = setCookie.match(/JSESSIONID=[^;]+/)?.[0];
+      if (jsessionid) {
+        this.sessionCookie = jsessionid;
+        await storage.saveSessionCookie(jsessionid);
+      }
+    }
+
+    const user: TraccarUser = await response.json();
 
     const authString = `${email}:${password}`;
-    const encodedAuth = btoa(authString);
-    this.authHeader = `Basic ${encodedAuth}`;
+    this.authHeader = `Basic ${btoa(authString)}`;
 
     await storage.saveSession(this.authHeader);
     await storage.saveUser(user);
@@ -152,96 +263,261 @@ class TraccarAPI {
     return user;
   }
 
-  async logout() {
+  async logout(): Promise<void> {
     try {
       await this.request('/api/session', { method: 'DELETE' });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    await storage.clearAll();
+    } catch {}
+    await storage.clearSession();
     this.authHeader = '';
+    this.sessionCookie = '';
   }
 
+  // ── Devices ──────────────────────────────────────────────────────────────────
+
   async getDevices(): Promise<TraccarDevice[]> {
-    return this.request('/api/devices');
+    return this.request<TraccarDevice[]>('/api/devices');
   }
 
   async getDevice(id: number): Promise<TraccarDevice> {
-    return this.request(`/api/devices/${id}`);
+    return this.request<TraccarDevice>(`/api/devices/${id}`);
   }
+
+  async createDevice(device: Partial<TraccarDevice>): Promise<TraccarDevice> {
+    return this.request<TraccarDevice>('/api/devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(device),
+    });
+  }
+
+  async updateDevice(id: number, device: Partial<TraccarDevice>): Promise<TraccarDevice> {
+    return this.request<TraccarDevice>(`/api/devices/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(device),
+    });
+  }
+
+  async deleteDevice(id: number): Promise<void> {
+    await this.request(`/api/devices/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Positions ─────────────────────────────────────────────────────────────────
 
   async getPositions(deviceId?: number): Promise<TraccarPosition[]> {
     const query = deviceId ? `?deviceId=${deviceId}` : '';
-    return this.request(`/api/positions${query}`);
+    return this.request<TraccarPosition[]>(`/api/positions${query}`);
   }
 
+  // ── Geofences ─────────────────────────────────────────────────────────────────
+
   async getGeofences(): Promise<TraccarGeofence[]> {
-    return this.request('/api/geofences');
+    return this.request<TraccarGeofence[]>('/api/geofences');
   }
 
   async getGeofence(id: number): Promise<TraccarGeofence> {
-    return this.request(`/api/geofences/${id}`);
+    return this.request<TraccarGeofence>(`/api/geofences/${id}`);
   }
 
   async createGeofence(geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
-    return this.request('/api/geofences', {
+    return this.request<TraccarGeofence>('/api/geofences', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geofence),
     });
   }
 
   async updateGeofence(id: number, geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
-    return this.request(`/api/geofences/${id}`, {
+    return this.request<TraccarGeofence>(`/api/geofences/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geofence),
     });
   }
 
   async deleteGeofence(id: number): Promise<void> {
-    await this.request(`/api/geofences/${id}`, {
-      method: 'DELETE',
-    });
-    // DELETE returns empty response, which is expected
+    await this.request(`/api/geofences/${id}`, { method: 'DELETE' });
   }
+
+  // ── Events ────────────────────────────────────────────────────────────────────
 
   async getEvents(deviceId?: number, from?: string, to?: string): Promise<TraccarEvent[]> {
     const params = new URLSearchParams();
     if (deviceId) params.append('deviceId', String(deviceId));
     if (from) params.append('from', from);
     if (to) params.append('to', to);
-
-    return this.request(`/api/events?${params.toString()}`);
+    const qs = params.toString();
+    return this.request<TraccarEvent[]>(`/api/events${qs ? `?${qs}` : ''}`);
   }
 
-  async sendCommand(deviceId: number, type: string, attributes: any = {}) {
-    return this.request('/api/commands/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        deviceId,
-        type,
-        attributes,
-      }),
-    });
-  }
+  // ── Reports ───────────────────────────────────────────────────────────────────
 
   async getRoute(deviceId: number, from: string, to: string): Promise<TraccarPosition[]> {
-    const params = new URLSearchParams({
-      deviceId: String(deviceId),
-      from,
-      to,
-    });
-
-    return this.request(`/api/positions?${params.toString()}`);
+    const params = new URLSearchParams({ deviceId: String(deviceId), from, to });
+    return this.request<TraccarPosition[]>(`/api/positions?${params}`);
   }
+
+  async getReportRoute(deviceId: number, from: string, to: string): Promise<TraccarPosition[]> {
+    const params = new URLSearchParams({ deviceId: String(deviceId), from, to });
+    return this.request<TraccarPosition[]>(`/api/reports/route?${params}`);
+  }
+
+  async getReportTrips(deviceId: number, from: string, to: string): Promise<TraccarTrip[]> {
+    const qs = this.buildReportQuery(deviceId, from, to);
+    const data = await this.request<TraccarTrip[]>(`/api/reports/trips?${qs}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getReportSummary(deviceId: number, from: string, to: string): Promise<TraccarSummary[]> {
+    const qs = this.buildReportQuery(deviceId, from, to);
+    const data = await this.request<TraccarSummary[]>(`/api/reports/summary?${qs}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getReportStops(deviceId: number, from: string, to: string): Promise<TraccarStop[]> {
+    const qs = this.buildReportQuery(deviceId, from, to);
+    const data = await this.request<TraccarStop[]>(`/api/reports/stops?${qs}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getReportEvents(deviceId: number, from: string, to: string): Promise<TraccarEvent[]> {
+    const qs = this.buildReportQuery(deviceId, from, to);
+    const data = await this.request<TraccarEvent[]>(`/api/reports/events?${qs}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  // ── Commands ──────────────────────────────────────────────────────────────────
+
+  async sendCommand(deviceId: number, type: string, attributes: Record<string, any> = {}): Promise<any> {
+    return this.request('/api/commands/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, type, attributes }),
+    });
+  }
+
+  async getSavedCommands(deviceId?: number): Promise<any[]> {
+    const qs = deviceId ? `?deviceId=${deviceId}` : '';
+    return this.request<any[]>(`/api/commands${qs}`);
+  }
+
+  // ── Drivers ───────────────────────────────────────────────────────────────────
+
+  async getDrivers(): Promise<TraccarDriver[]> {
+    return this.request<TraccarDriver[]>('/api/drivers');
+  }
+
+  async createDriver(driver: Partial<TraccarDriver>): Promise<TraccarDriver> {
+    return this.request<TraccarDriver>('/api/drivers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(driver),
+    });
+  }
+
+  async updateDriver(id: number, driver: Partial<TraccarDriver>): Promise<TraccarDriver> {
+    return this.request<TraccarDriver>(`/api/drivers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(driver),
+    });
+  }
+
+  async deleteDriver(id: number): Promise<void> {
+    await this.request(`/api/drivers/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────────────
+
+  async getNotifications(): Promise<TraccarNotification[]> {
+    return this.request<TraccarNotification[]>('/api/notifications');
+  }
+
+  // ── Groups ────────────────────────────────────────────────────────────────────
+
+  async getGroups(): Promise<TraccarGroup[]> {
+    return this.request<TraccarGroup[]>('/api/groups');
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────────────
+
+  async getUsers(): Promise<TraccarUser[]> {
+    return this.request<TraccarUser[]>('/api/users');
+  }
+
+  async getSession(): Promise<TraccarUser> {
+    return this.request<TraccarUser>('/api/session');
+  }
+
+  async updateUser(id: number, user: Partial<TraccarUser>): Promise<TraccarUser> {
+    return this.request<TraccarUser>(`/api/users/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    });
+  }
+
+  async createUser(user: Partial<TraccarUser> & { password?: string }): Promise<TraccarUser> {
+    return this.request<TraccarUser>('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    });
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await this.request(`/api/users/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Permissions ─────────────────────────────────────────────────────────────
+
+  async getPermissions(userId?: number, deviceId?: number): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', String(userId));
+    if (deviceId) params.append('deviceId', String(deviceId));
+    const qs = params.toString();
+    return this.request<any[]>(`/api/permissions${qs ? `?${qs}` : ''}`);
+  }
+
+  async linkPermission(userId: number, deviceId: number): Promise<void> {
+    await this.request('/api/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, deviceId }),
+    });
+  }
+
+  async unlinkPermission(userId: number, deviceId: number): Promise<void> {
+    await this.request('/api/permissions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, deviceId }),
+    });
+  }
+
+  async linkDriverPermission(deviceId: number, driverId: number): Promise<void> {
+    await this.request('/api/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, driverId }),
+    });
+  }
+
+  // ── Server ────────────────────────────────────────────────────────────────────
+
+  async getServer(): Promise<any> {
+    return this.request('/api/server');
+  }
+
+  async updateServer(server: any): Promise<any> {
+    return this.request('/api/server', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(server),
+    });
+  }
+
+  // ── WebSocket URL ─────────────────────────────────────────────────────────────
 
   getWebSocketUrl(): string {
     const wsProtocol = this.baseUrl.startsWith('https') ? 'wss' : 'ws';

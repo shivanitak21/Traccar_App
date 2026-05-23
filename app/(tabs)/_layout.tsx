@@ -1,26 +1,58 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
-import { LayoutDashboard, Car, Map, Settings } from 'lucide-react-native';
+import { View, Platform, StyleSheet } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
+import {
+  LayoutDashboard,
+  Navigation,
+  Map,
+  Bell,
+  BarChart3,
+  Settings,
+} from 'lucide-react-native';
 import { colors } from '../../src/theme/colors';
+import { typography } from '../../src/theme/typography';
+import { useAuthStore } from '../../src/stores/authStore';
+
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 80 : 64;
 
 export default function TabLayout() {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Redirect href="/" />;
+  }
+
   return (
+    <View style={styles.wrapper}>
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.glass.border,
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          backgroundColor: colors.tabBar.background,
+          borderTopColor: colors.tabBar.border,
+          borderTopWidth: 0.5,
+          height: TAB_BAR_HEIGHT,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          // backdrop blur on iOS
+          ...Platform.select({
+            ios: {
+              position: 'absolute',
+            },
+          }),
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text.tertiary,
+        tabBarActiveTintColor: colors.tabBar.active,
+        tabBarInactiveTintColor: colors.tabBar.inactive,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          ...typography.tabLabel,
+          marginTop: 2,
         },
+        tabBarItemStyle: {
+          gap: 2,
+        },
+        tabBarBackground: () => (
+          <View style={[StyleSheet.absoluteFill, styles.tabBarBg]} />
+        ),
       }}
     >
       <Tabs.Screen
@@ -28,16 +60,16 @@ export default function TabLayout() {
         options={{
           title: 'Dashboard',
           tabBarIcon: ({ size, color }) => (
-            <LayoutDashboard size={size} color={color} />
+            <LayoutDashboard size={size} color={color} strokeWidth={1.8} />
           ),
         }}
       />
       <Tabs.Screen
         name="devices"
         options={{
-          title: 'Devices',
+          title: 'Fleet',
           tabBarIcon: ({ size, color }) => (
-            <Car size={size} color={color} />
+            <Navigation size={size} color={color} strokeWidth={1.8} />
           ),
         }}
       />
@@ -45,8 +77,28 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Map',
+          tabBarIcon: ({ size, color, focused }) => (
+            <View style={focused ? styles.mapIconActive : undefined}>
+              <Map size={size} color={color} strokeWidth={1.8} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="alerts"
+        options={{
+          title: 'Alerts',
           tabBarIcon: ({ size, color }) => (
-            <Map size={size} color={color} />
+            <Bell size={size} color={color} strokeWidth={1.8} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="reports"
+        options={{
+          title: 'Reports',
+          tabBarIcon: ({ size, color }) => (
+            <BarChart3 size={size} color={color} strokeWidth={1.8} />
           ),
         }}
       />
@@ -55,10 +107,27 @@ export default function TabLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ size, color }) => (
-            <Settings size={size} color={color} />
+            <Settings size={size} color={color} strokeWidth={1.8} />
           ),
         }}
       />
     </Tabs>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+  },
+  tabBarBg: {
+    backgroundColor: colors.tabBar.background,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.tabBar.border,
+  },
+  mapIconActive: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 10,
+    padding: 4,
+  },
+});

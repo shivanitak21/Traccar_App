@@ -1,20 +1,13 @@
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { SettingsScreen } from '../../src/screens/SettingsScreen';
-import { SafeAreaView, StyleSheet } from 'react-native';
 import { colors } from '../../src/theme/colors';
-import { useRouter } from 'expo-router';
 
 export default function SettingsTab() {
-  const router = useRouter();
-
-  const handleLogout = () => {
-    router.replace('/');
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
-      <SettingsScreen onLogout={handleLogout} />
-    </SafeAreaView>
+    <View style={styles.container}>
+      <SettingsScreen onLogout={() => {}} />
+    </View>
   );
 }
 

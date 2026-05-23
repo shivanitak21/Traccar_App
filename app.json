@@ -1,15 +1,36 @@
 {
   "expo": {
-    "name": "Fleet Tracker",
+    "name": "Elevatics Fleet",
     "slug": "fleet-tracker",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fleet-tracker",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "backgroundColor": "#0d0f14",
+    "splash": {
+      "backgroundColor": "#0d0f14"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.elevatics.fleet",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Fleet Tracker needs your location to display it on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Fleet Tracker uses your location for live tracking."
+      }
+    },
+    "android": {
+      "package": "com.elevatics.fleet",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0d0f14"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -23,13 +44,17 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Traccar Fleet App to use your location."
+          "locationAlwaysAndWhenInUsePermission": "Allow Elevatics Fleet to use your location for live tracking."
         }
       ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "traccarBaseUrl": "https://elevaticsiot.com",
+      "mapboxPublicToken": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw"
     }
   }
 }
