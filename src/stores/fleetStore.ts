@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { TraccarDevice, TraccarPosition, TraccarEvent } from '../api/traccar';
+import { resolveAddressesForPositions } from '../utils/address';
 
 export type DeviceStatus = 'online' | 'offline' | 'unknown';
 
@@ -57,6 +58,7 @@ function computeDeviceStatus(device: TraccarDevice, position?: TraccarPosition):
   return {
     ...device,
     position,
+    address: device.address || position?.address,
     computedStatus,
     speedKmh,
     isMoving,
@@ -73,8 +75,17 @@ export const useFleetStore = create<FleetState>((set, get) => ({
   wsConnected: false,
 
   setDevices: (rawDevices) => {
-    const { positions } = get();
-    const devices = rawDevices.map(d => computeDeviceStatus(d, positions.get(d.id)));
+    const { positions, devices: existingDevices } = get();
+    const addressById = new Map(
+      existingDevices.map(d => [d.id, d.address]).filter((entry): entry is [number, string] => Boolean(entry[1])),
+    );
+
+    const devices = rawDevices.map(d => {
+      const withPos = computeDeviceStatus(d, positions.get(d.id));
+      const savedAddress = addressById.get(d.id) || withPos.address;
+      return savedAddress ? { ...withPos, address: savedAddress } : withPos;
+    });
+
     set({ devices });
   },
 
@@ -102,6 +113,12 @@ export const useFleetStore = create<FleetState>((set, get) => ({
 
       return { positions, devices };
     });
+
+    void resolveAddressesForPositions(
+      newPositions,
+      (deviceId, address) => get().updateDeviceAddress(deviceId, address),
+      (deviceId) => Boolean(get().devices.find(d => d.id === deviceId)?.address),
+    );
   },
 
   addEvents: (events) => {

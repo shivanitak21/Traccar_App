@@ -48,6 +48,9 @@ interface WebMapViewProps {
   onGeofencePress?: (geofenceId: number) => void;
   drawingMode?: DrawingMode;
   onGeofenceDrawn?: (area: string) => void;
+  fitToMarkers?: boolean;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
   style?: any;
   smoothPlayback?: boolean;
   followMarker?: boolean;
@@ -66,12 +69,22 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
   onGeofencePress,
   drawingMode = 'none',
   onGeofenceDrawn,
+  fitToMarkers = false,
+  onInteractionStart,
+  onInteractionEnd,
   style,
   smoothPlayback = false,
   followMarker = false,
 }) => {
   const webViewRef = useRef<WebView>(null);
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onInteractionStartRef = useRef(onInteractionStart);
+  const onInteractionEndRef = useRef(onInteractionEnd);
+
+  useEffect(() => {
+    onInteractionStartRef.current = onInteractionStart;
+    onInteractionEndRef.current = onInteractionEnd;
+  }, [onInteractionStart, onInteractionEnd]);
 
   // Memoize map data to prevent unnecessary updates
   const mapData = useMemo(() => ({
@@ -85,7 +98,8 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     drawingMode,
     smoothPlayback,
     followMarker,
-  }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode, smoothPlayback, followMarker]);
+    fitToMarkers,
+  }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode, smoothPlayback, followMarker, fitToMarkers]);
 
   const updateMap = useCallback(() => {
     if (webViewRef.current) {
@@ -131,6 +145,10 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         onGeofencePress(data.geofenceId);
       } else if (data.type === 'geofenceDrawn' && onGeofenceDrawn) {
         onGeofenceDrawn(data.area);
+      } else if (data.type === 'interactionStart') {
+        onInteractionStartRef.current?.();
+      } else if (data.type === 'interactionEnd') {
+        onInteractionEndRef.current?.();
       }
     } catch (error) {
       console.error('Error parsing WebView message:', error);
@@ -363,8 +381,23 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     function initMap() {
       map = L.map('map', {
         zoomControl: true,
-        attributionControl: false
+        attributionControl: false,
+        touchZoom: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        boxZoom: true,
+        dragging: true,
       }).setView([20.5937, 78.9629], 5);
+
+      function notifyInteraction(active) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: active ? 'interactionStart' : 'interactionEnd'
+        }));
+      }
+
+      map.on('touchstart', () => notifyInteraction(true));
+      map.on('touchend', () => notifyInteraction(false));
+      map.on('touchcancel', () => notifyInteraction(false));
 
       setMapLayer('normal');
 
@@ -470,10 +503,6 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         disableDrawing();
       }
 
-      if (data.center && map && !data.smoothPlayback) {
-        map.setView([data.center.latitude, data.center.longitude], data.zoom || 13);
-      }
-
       if (data.markers && Array.isArray(data.markers)) {
         // STRICT deduplication - only ONE marker per unique ID
         const processedIds = new Set();
@@ -515,6 +544,17 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         console.log('WebMapView: Added', processedIds.size, 'unique markers');
       }
 
+      if (data.fitToMarkers && markersLayer.length > 0) {
+        const group = L.featureGroup(markersLayer);
+        map.fitBounds(group.getBounds(), {
+          padding: [48, 48],
+          maxZoom: 14,
+          animate: false,
+        });
+      } else if (data.center && map && !data.smoothPlayback) {
+        map.setView([data.center.latitude, data.center.longitude], data.zoom || 13);
+      }
+
       // Add geofences
       if (data.geofences && Array.isArray(data.geofences)) {
         data.geofences.forEach(geofence => {
@@ -522,7 +562,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           if (!areaData) return;
 
           const isSelected = data.selectedGeofenceId === geofence.id;
-          const color = isSelected ? '#ff0055' : (geofence.color || '#00f3ff');
+          const color = isSelected ? '#E8A84A' : (geofence.color || '#00f3ff');
           const opacity = isSelected ? 0.4 : 0.2;
           const weight = isSelected ? 3 : 2;
 
@@ -714,6 +754,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         allowsInlineMediaPlayback
         setSupportMultipleWindows={false}
         androidLayerType="hardware"
+        nestedScrollEnabled
         onLoadEnd={updateMap}
       />
     </View>
@@ -761,7 +802,8 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     prevProps.selectedGeofenceId === nextProps.selectedGeofenceId &&
     prevProps.drawingMode === nextProps.drawingMode &&
     prevProps.smoothPlayback === nextProps.smoothPlayback &&
-    prevProps.followMarker === nextProps.followMarker
+    prevProps.followMarker === nextProps.followMarker &&
+    prevProps.fitToMarkers === nextProps.fitToMarkers
   );
 });
 

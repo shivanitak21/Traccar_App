@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import Animated, {
-  FadeIn,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -10,14 +9,13 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LoginScreen } from '../src/screens/LoginScreen';
 import { colors } from '../src/theme/colors';
 import { useAuthStore } from '../src/stores/authStore';
 
 export default function Index() {
   const { isAuthenticated, isLoading, hasHydrated, initialize } = useAuthStore();
+  const didInitRef = useRef(false);
 
-  // Splash pulse animation
   const pulse = useSharedValue(0.8);
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -35,9 +33,9 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    if (!hasHydrated) {
-      initialize();
-    }
+    if (didInitRef.current || hasHydrated) return;
+    didInitRef.current = true;
+    initialize();
   }, [hasHydrated, initialize]);
 
   if (!hasHydrated || isLoading) {
@@ -63,7 +61,7 @@ export default function Index() {
     return <Redirect href="/(tabs)" />;
   }
 
-  return <LoginScreen onLoginSuccess={() => {}} />;
+  return <Redirect href="/login" />;
 }
 
 const styles = StyleSheet.create({

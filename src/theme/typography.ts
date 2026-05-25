@@ -1,8 +1,7 @@
 import { TextStyle } from 'react-native';
 
-// Premium typography — sophisticated minimal luxury SaaS feel
 export const fontFamily = {
-  regular: undefined,   // System default (San Francisco / Roboto)
+  regular: undefined,
   medium: undefined,
   semiBold: undefined,
   bold: undefined,
@@ -10,134 +9,135 @@ export const fontFamily = {
 };
 
 export const typography = {
-  // Display
   display: {
-    fontSize: 36,
-    lineHeight: 44,
+    fontSize: 40,
+    lineHeight: 48,
     fontWeight: '700' as TextStyle['fontWeight'],
-    letterSpacing: -0.5,
+    letterSpacing: -1.2,
   },
 
-  // Headings
   h1: {
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: 34,
+    lineHeight: 41,
     fontWeight: '700' as TextStyle['fontWeight'],
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
   },
   h2: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700' as TextStyle['fontWeight'],
+    letterSpacing: -0.4,
+  },
+  h3: {
     fontSize: 22,
-    lineHeight: 30,
+    lineHeight: 28,
     fontWeight: '600' as TextStyle['fontWeight'],
     letterSpacing: -0.2,
   },
-  h3: {
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '600' as TextStyle['fontWeight'],
-    letterSpacing: -0.1,
-  },
   h4: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: '600' as TextStyle['fontWeight'],
-    letterSpacing: 0,
+    letterSpacing: -0.2,
   },
 
-  // Body
   bodyLg: {
-    fontSize: 16,
+    fontSize: 17,
     lineHeight: 24,
     fontWeight: '400' as TextStyle['fontWeight'],
-    letterSpacing: 0,
+    letterSpacing: -0.2,
   },
   body: {
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 22,
     fontWeight: '400' as TextStyle['fontWeight'],
-    letterSpacing: 0,
+    letterSpacing: -0.1,
   },
   bodyMd: {
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 20,
     fontWeight: '500' as TextStyle['fontWeight'],
-    letterSpacing: 0,
+    letterSpacing: -0.1,
   },
 
-  // Small / Caption
   caption: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400' as TextStyle['fontWeight'],
-    letterSpacing: 0.1,
+    letterSpacing: 0,
   },
   captionMd: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500' as TextStyle['fontWeight'],
-    letterSpacing: 0.1,
+    letterSpacing: 0,
   },
   small: {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '400' as TextStyle['fontWeight'],
-    letterSpacing: 0.2,
+    letterSpacing: 0,
   },
   smallMd: {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500' as TextStyle['fontWeight'],
-    letterSpacing: 0.2,
+    letterSpacing: 0,
   },
   tiny: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '500' as TextStyle['fontWeight'],
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
 
-  // Special
   label: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600' as TextStyle['fontWeight'],
-    letterSpacing: 0.8,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400' as TextStyle['fontWeight'],
+    letterSpacing: -0.08,
+    textTransform: 'none' as TextStyle['textTransform'],
+  },
+  sectionLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400' as TextStyle['fontWeight'],
+    letterSpacing: -0.08,
     textTransform: 'uppercase' as TextStyle['textTransform'],
   },
   mono: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400' as TextStyle['fontWeight'],
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
   },
   tabLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600' as TextStyle['fontWeight'],
-    letterSpacing: 0.3,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '500' as TextStyle['fontWeight'],
+    letterSpacing: 0.1,
   },
 
-  // Numeric / metric display
   metric: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 36,
+    lineHeight: 42,
     fontWeight: '700' as TextStyle['fontWeight'],
-    letterSpacing: -1,
+    letterSpacing: -1.5,
     fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
   },
   metricSm: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '700' as TextStyle['fontWeight'],
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
     fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
   },
   speed: {
-    fontSize: 42,
-    lineHeight: 50,
-    fontWeight: '800' as TextStyle['fontWeight'],
-    letterSpacing: -2,
+    fontSize: 48,
+    lineHeight: 52,
+    fontWeight: '700' as TextStyle['fontWeight'],
+    letterSpacing: -2.5,
     fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
   },
 };

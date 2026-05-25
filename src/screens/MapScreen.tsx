@@ -10,20 +10,26 @@ import { MapPin, X, Layers } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { useCompanionStore } from '../stores/companionStore';
 import { formatSpeed } from '../utils/units';
-import { reverseGeocode } from '../utils/geocoding';
+import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
+import { useTabBarBottomInset } from '../utils/tabBarInset';
 
 const DEFAULT_MAP_CENTER = { latitude: 20.5937, longitude: 78.9629 };
 
 export const MapScreen: React.FC = () => {
   const { prefs } = usePrefsStore();
   const openCompanion = useCompanionStore(state => state.open);
+  const tabBarBottomInset = useTabBarBottomInset(12);
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
   const [positions, setPositions] = useState<Map<number, TraccarPosition>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
-  const [mapLayer, setMapLayer] = useState<MapLayerType>('normal');
+  const [mapLayer, setMapLayer] = useState<MapLayerType>(prefs.darkMap ? 'normal' : 'streets');
   const [showLayerSelector, setShowLayerSelector] = useState(false);
   const [deviceAddresses, setDeviceAddresses] = useState<Map<number, string>>(new Map());
+
+  useEffect(() => {
+    setMapLayer(prefs.darkMap ? 'normal' : 'streets');
+  }, [prefs.darkMap]);
 
   const loadData = async () => {
     try {
@@ -41,15 +47,9 @@ export const MapScreen: React.FC = () => {
       await Promise.all(
         positionsData.map(async (pos) => {
           posMap.set(pos.deviceId, pos);
-          
-          if (pos.address) {
-            addressMap.set(pos.deviceId, pos.address);
-          } else {
-            const addr = await reverseGeocode(pos.latitude, pos.longitude);
-            if (addr) {
-              addressMap.set(pos.deviceId, addr);
-            }
-          }
+
+          const address = pos.address || await resolveAddressForPosition(pos);
+          if (address) addressMap.set(pos.deviceId, address);
         })
       );
       
@@ -75,15 +75,9 @@ export const MapScreen: React.FC = () => {
           posMap.set(pos.deviceId, pos);
           
           // Update address if not already cached
-          if (!addressMap.has(pos.deviceId)) {
-            if (pos.address) {
-              addressMap.set(pos.deviceId, pos.address);
-            } else {
-              const addr = await reverseGeocode(pos.latitude, pos.longitude);
-              if (addr) {
-                addressMap.set(pos.deviceId, addr);
-              }
-            }
+          if (!addressMap.has(pos.deviceId) || pos.address) {
+            const address = await resolveAddressForPosition(pos);
+            if (address) addressMap.set(pos.deviceId, address);
           }
         })
       );
@@ -104,12 +98,29 @@ export const MapScreen: React.FC = () => {
   };
 
   const getMapCenter = () => {
+    if (selectedDeviceId) {
+      const pos = positions.get(selectedDeviceId);
+      if (pos) return { latitude: pos.latitude, longitude: pos.longitude };
+    }
     if (positions.size === 0) return DEFAULT_MAP_CENTER;
-    const firstPos = Array.from(positions.values())[0];
-    return { latitude: firstPos.latitude, longitude: firstPos.longitude };
+    const coords = Array.from(positions.values());
+    if (coords.length === 1) {
+      return { latitude: coords[0].latitude, longitude: coords[0].longitude };
+    }
+    const latSum = coords.reduce((sum, pos) => sum + pos.latitude, 0);
+    const lonSum = coords.reduce((sum, pos) => sum + pos.longitude, 0);
+    return {
+      latitude: latSum / coords.length,
+      longitude: lonSum / coords.length,
+    };
   };
 
-  const getMapZoom = () => (positions.size > 0 ? 13 : 5);
+  const getMapZoom = () => {
+    if (selectedDeviceId) return 14;
+    if (positions.size === 1) return 13;
+    if (positions.size > 1) return 11;
+    return 5;
+  };
 
   const getMarkers = () => {
     // Create EXACTLY one marker per device - no duplicates
@@ -133,14 +144,19 @@ export const MapScreen: React.FC = () => {
       // Mark as processed
       processedDeviceIds.add(deviceId);
       
-      const speedLabel = formatSpeed(position.speed, prefs.speedUnit);
-      
+      const address = deviceAddresses.get(deviceId);
+
       uniqueMarkers.push({
         id: `vehicle-${deviceId}`,
         latitude: position.latitude,
         longitude: position.longitude,
         title: device.name,
-        description: speedLabel,
+        description: getLocationLabel({
+          address,
+          positionAddress: position.address,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        }),
         color: device.status === 'online' ? colors.success : colors.error,
         deviceName: device.name,
         deviceModel: device.model || '',
@@ -162,6 +178,8 @@ export const MapScreen: React.FC = () => {
 
   const selectedPosition = selectedDeviceId ? positions.get(selectedDeviceId) : null;
   const selectedDevice = selectedDeviceId ? devices.find(d => d.id === selectedDeviceId) : null;
+  const mapMarkers = getMarkers();
+  const shouldFitAllMarkers = !selectedDeviceId && mapMarkers.length > 0;
 
   if (loading) {
     return (
@@ -176,9 +194,10 @@ export const MapScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.mapContainer}>
         <WebMapView
-          markers={getMarkers()}
+          markers={mapMarkers}
           center={getMapCenter()}
           zoom={getMapZoom()}
+          fitToMarkers={shouldFitAllMarkers}
           onMarkerPress={(markerId) => {
             const deviceId = parseInt(markerId.replace('vehicle-', ''), 10);
             if (!isNaN(deviceId)) {
@@ -238,7 +257,7 @@ export const MapScreen: React.FC = () => {
         )}
 
         {selectedPosition && selectedDevice && (
-          <View style={styles.deviceDetailsOverlay}>
+          <View style={[styles.deviceDetailsOverlay, { bottom: tabBarBottomInset }]}>
             <GlassCard style={styles.deviceDetailsCard}>
               <View style={styles.deviceDetailsHeader}>
                 <View style={styles.deviceDetailsInfo}>
@@ -256,7 +275,14 @@ export const MapScreen: React.FC = () => {
               </View>
               <View style={styles.deviceDetailsBody}>
                 <Text style={styles.address}>
-                  📍 {selectedDeviceId ? deviceAddresses.get(selectedDeviceId) || 'Loading address...' : 'No address'}
+                  📍 {selectedDeviceId
+                    ? getLocationLabel({
+                        address: deviceAddresses.get(selectedDeviceId),
+                        positionAddress: selectedPosition.address,
+                        latitude: selectedPosition.latitude,
+                        longitude: selectedPosition.longitude,
+                      })
+                    : 'No address'}
                 </Text>
                 <Text style={styles.timestamp}>
                   Last update: {new Date(selectedPosition.fixTime).toLocaleTimeString()}
@@ -317,10 +343,9 @@ const styles = StyleSheet.create({
   },
   deviceDetailsOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
+    paddingHorizontal: 16,
   },
   deviceDetailsCard: {
     padding: 16,

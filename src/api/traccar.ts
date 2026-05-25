@@ -146,6 +146,19 @@ export interface TraccarGroup {
   attributes?: Record<string, any>;
 }
 
+export interface TraccarPermission {
+  userId?: number;
+  deviceId?: number;
+  groupId?: number;
+  geofenceId?: number;
+  notificationId?: number;
+  calendarId?: number;
+  attributeId?: number;
+  driverId?: number;
+  managedUserId?: number;
+  commandId?: number;
+}
+
 // ── API Client ─────────────────────────────────────────────────────────────────
 
 class TraccarAPI {
@@ -173,6 +186,11 @@ class TraccarAPI {
 
   setSessionCookie(cookie: string) {
     this.sessionCookie = cookie;
+  }
+
+  clearAuth() {
+    this.authHeader = '';
+    this.sessionCookie = '';
   }
 
   private buildReportQuery(deviceId: number, from: string, to: string): string {
@@ -264,12 +282,14 @@ class TraccarAPI {
   }
 
   async logout(): Promise<void> {
+    const hadAuth = Boolean(this.authHeader || this.sessionCookie);
     try {
-      await this.request('/api/session', { method: 'DELETE' });
+      if (hadAuth) {
+        await this.request('/api/session', { method: 'DELETE' });
+      }
     } catch {}
     await storage.clearSession();
-    this.authHeader = '';
-    this.sessionCookie = '';
+    this.clearAuth();
   }
 
   // ── Devices ──────────────────────────────────────────────────────────────────
@@ -470,13 +490,33 @@ class TraccarAPI {
   }
 
   // ── Permissions ─────────────────────────────────────────────────────────────
+  // Traccar requires exactly two *Id query params (use 0 for "any" on one side).
 
-  async getPermissions(userId?: number, deviceId?: number): Promise<any[]> {
-    const params = new URLSearchParams();
-    if (userId) params.append('userId', String(userId));
-    if (deviceId) params.append('deviceId', String(deviceId));
-    const qs = params.toString();
-    return this.request<any[]>(`/api/permissions${qs ? `?${qs}` : ''}`);
+  async getPermissions(userId: number, deviceId = 0): Promise<TraccarPermission[]> {
+    if (userId === 0 && deviceId === 0) {
+      throw new Error('getPermissions requires a non-zero userId or deviceId');
+    }
+
+    const params = new URLSearchParams({
+      userId: String(userId),
+      deviceId: String(deviceId),
+    });
+
+    const data = await this.request<TraccarPermission[]>(`/api/permissions?${params.toString()}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getAllUserDevicePermissions(users: TraccarUser[]): Promise<TraccarPermission[]> {
+    const results = await Promise.all(
+      users.map(async user => {
+        try {
+          return await this.getPermissions(user.id, 0);
+        } catch {
+          return [];
+        }
+      })
+    );
+    return results.flat();
   }
 
   async linkPermission(userId: number, deviceId: number): Promise<void> {

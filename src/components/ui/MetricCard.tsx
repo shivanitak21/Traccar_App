@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 
 interface MetricCardProps {
   label: string;
@@ -22,7 +22,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   unit,
   icon,
   trend,
-  accent = colors.primary,
+  accent = colors.text.primary,
   style,
   size = 'md',
 }) => {
@@ -31,10 +31,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   return (
     <View style={[styles.container, isLg && styles.lg, isSm && styles.sm, style]}>
-      <View style={[styles.accentBar, { backgroundColor: accent }]} />
-
       {icon && (
-        <View style={[styles.iconWrapper, { backgroundColor: `${accent}18` }]}>
+        <View style={[styles.iconWrapper, { backgroundColor: `${accent}14` }]}>
           {icon}
         </View>
       )}
@@ -65,7 +63,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-// Fleet summary strip — 2x2 grid of key stats
 interface FleetStatsProps {
   total: number;
   online: number;
@@ -80,10 +77,10 @@ export const FleetStatsStrip: React.FC<FleetStatsProps> = ({
   idle,
 }) => {
   const stats = [
-    { label: 'Total', value: total, color: colors.text.secondary },
+    { label: 'Fleet', value: total, color: colors.text.primary },
     { label: 'Online', value: online, color: colors.success },
     { label: 'Moving', value: moving, color: colors.blue },
-    { label: 'Idle', value: idle, color: colors.accent },
+    { label: 'Idle', value: idle, color: colors.warning },
   ];
 
   return (
@@ -102,48 +99,37 @@ export const FleetStatsStrip: React.FC<FleetStatsProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
+    borderRadius: radius.card,
     padding: spacing.cardPadding,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     overflow: 'hidden',
     position: 'relative',
     flex: 1,
   },
   sm: {
     padding: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
   },
   lg: {
     padding: 20,
-    borderRadius: 16,
-  },
-  accentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    borderTopRightRadius: 2,
-    borderBottomRightRadius: 2,
+    borderRadius: radius.xl,
   },
   iconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: radius.control,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   content: {
-    paddingLeft: 4,
+    gap: 4,
   },
   label: {
-    ...typography.small,
+    ...typography.caption,
     color: colors.text.tertiary,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.2,
   },
   valueRow: {
     flexDirection: 'row',
@@ -155,12 +141,12 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   valueLg: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 36,
+    lineHeight: 42,
   },
   valueSm: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
   },
   unit: {
     ...typography.caption,
@@ -179,34 +165,33 @@ const stripStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: 14,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     overflow: 'hidden',
   },
   item: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 18,
     paddingHorizontal: 8,
     position: 'relative',
   },
   value: {
     ...typography.metricSm,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   label: {
     ...typography.tiny,
     color: colors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   divider: {
     position: 'absolute',
     right: 0,
-    top: '20%',
-    bottom: '20%',
-    width: 1,
+    top: '22%',
+    bottom: '22%',
+    width: StyleSheet.hairlineWidth,
     backgroundColor: colors.border.subtle,
   },
 });

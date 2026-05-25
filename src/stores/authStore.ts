@@ -4,6 +4,7 @@ import { traccarWS } from '../api/websocket';
 import { storage } from '../utils/storage';
 import { API_CONFIG } from '../api/config';
 import { useFleetStore } from './fleetStore';
+import { useCompanionStore } from './companionStore';
 import { queryClient } from '../api/queryClient';
 
 interface AuthState {
@@ -63,7 +64,16 @@ export const useAuthStore = create<AuthState>((set) => ({
         user = await traccarAPI.getSession();
         await storage.saveUser(user);
       } catch {
-        // Fall back to cached user if session refresh fails
+        await storage.clearSession();
+        traccarAPI.clearAuth();
+        set({
+          user: null,
+          serverUrl: url,
+          isAuthenticated: false,
+          isLoading: false,
+          hasHydrated: true,
+        });
+        return false;
       }
 
       set({
@@ -98,23 +108,25 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     traccarWS.disconnect();
-
-    try {
-      await traccarAPI.logout();
-    } catch {}
-
+    useCompanionStore.getState().close();
+    traccarAPI.clearAuth();
     useFleetStore.getState().reset();
     queryClient.clear();
 
-    const savedUrl = await storage.getServerUrl();
     set({
       user: null,
-      serverUrl: savedUrl ?? API_CONFIG.DEFAULT_BASE_URL,
       isAuthenticated: false,
       isLoading: false,
       hasHydrated: true,
       error: null,
     });
+
+    try {
+      await traccarAPI.logout();
+    } catch {}
+
+    const savedUrl = await storage.getServerUrl();
+    set({ serverUrl: savedUrl ?? API_CONFIG.DEFAULT_BASE_URL });
   },
 
   setUser: (user) => set({ user }),

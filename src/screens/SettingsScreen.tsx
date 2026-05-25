@@ -10,7 +10,6 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   User,
@@ -32,16 +31,19 @@ import {
   Ruler,
   Fuel,
 } from 'lucide-react-native';
-import { useRouter, useRootNavigationState } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
 import { GlassCard } from '../components/GlassCard';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useAuthStore } from '../stores/authStore';
 import { usePrefsStore } from '../stores/prefsStore';
-import { traccarWS } from '../api/websocket';
 import { storage } from '../utils/storage';
+import { traccarWS } from '../api/websocket';
 
 interface SettingsScreenProps {
   onLogout: () => void;
@@ -49,7 +51,6 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const router = useRouter();
-  const rootNavigationState = useRootNavigationState();
   const { user, serverUrl, logout } = useAuthStore();
   const { prefs, initialize: initPrefs, setPref, savePrefs } = usePrefsStore();
   const [wsConnected, setWsConnected] = useState(traccarWS.isConnected);
@@ -66,34 +67,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     return () => traccarWS.off('connected', handleConnect);
   }, []);
 
-  const navigateToLogin = () => {
-    const go = () => {
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace('/');
-    };
-
-    if (rootNavigationState?.key) {
-      go();
-      return;
-    }
-
-    setTimeout(() => {
-      if (useAuthStore.getState().isAuthenticated) return;
-      go();
-    }, 0);
+  const handleDarkMapToggle = (value: boolean) => {
+    setPref('darkMap', value);
+    void storage.savePreferences({ ...usePrefsStore.getState().prefs, darkMap: value });
   };
 
-  const performLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      navigateToLogin();
-      onLogout();
-    }
+  const performLogout = () => {
+    void logout();
+    onLogout();
   };
 
   const handleLogout = () => {
@@ -152,36 +133,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     : 'U';
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
-
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <Animated.View entering={FadeInDown.delay(0).duration(500)}>
-            <Text style={styles.screenTitle}>Settings</Text>
+            <ScreenHeader title="Settings" />
           </Animated.View>
 
           {/* Profile card */}
           <Animated.View entering={FadeInDown.delay(60).duration(500)}>
             <GlassCard variant="elevated" style={styles.profileCard}>
-              <LinearGradient
-                colors={['rgba(16,185,129,0.08)', 'rgba(59,130,246,0.04)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
               <View style={styles.profileRow}>
                 <View style={styles.avatar}>
-                  <LinearGradient
-                    colors={[colors.primary, colors.primaryLight]}
-                    style={styles.avatarGradient}
-                  >
-                    <Text style={styles.avatarText}>{initials}</Text>
-                  </LinearGradient>
+                  <Text style={styles.avatarText}>{initials}</Text>
                 </View>
                 <View style={styles.profileInfo}>
                   <Text style={styles.profileName}>{user?.name || 'Administrator'}</Text>
@@ -256,9 +223,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               <Separator />
               <SettingsToggleRow
                 icon={<Moon size={18} color={colors.blue} strokeWidth={1.8} />}
-                label="Dark map style"
+                label="Dark map tiles"
                 value={prefs.darkMap}
-                onToggle={v => setPref('darkMap', v)}
+                onToggle={handleDarkMapToggle}
               />
               <Separator />
               <SettingsToggleRow
@@ -337,7 +304,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </Animated.View>
 
           {/* Logout */}
-          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ marginBottom: 40 }}>
+          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ marginBottom: 120 }}>
             <Pressable
               onPress={handleLogout}
               style={({ pressed }) => [styles.logoutBtn, pressed && styles.pressed]}
@@ -348,7 +315,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </ScreenBackground>
   );
 };
 
@@ -360,10 +327,10 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
 
 const sectionStyles = StyleSheet.create({
   header: {
-    ...typography.label,
+    ...typography.sectionLabel,
     color: colors.text.tertiary,
     marginBottom: 8,
-    marginTop: 24,
+    marginTop: 28,
     paddingHorizontal: 4,
   },
 });
@@ -461,48 +428,37 @@ const srStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   safeArea: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: 16,
-  },
-  screenTitle: {
-    ...typography.h2,
-    color: colors.text.primary,
-    marginBottom: 20,
   },
 
-  // Profile
   profileCard: {
-    padding: 18,
+    padding: 20,
     overflow: 'hidden',
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: radius.control,
     overflow: 'hidden',
-  },
-  avatarGradient: {
-    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0d0f14',
+    color: colors.text.primary,
     letterSpacing: -0.5,
   },
   profileInfo: {
@@ -521,16 +477,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.primaryMuted,
+    backgroundColor: colors.accentMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: radius.pill,
     alignSelf: 'flex-start',
     marginTop: 2,
   },
   adminText: {
     ...typography.tiny,
-    color: colors.primary,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
   editBtn: {
@@ -540,24 +496,23 @@ const styles = StyleSheet.create({
   // Settings groups
   settingsGroup: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     overflow: 'hidden',
   },
 
-  // Logout
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: colors.errorMuted,
-    borderRadius: 14,
-    padding: 16,
-    marginTop: 24,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: 18,
+    marginTop: 28,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.18)',
+    borderColor: colors.border.alert,
   },
   logoutText: {
     ...typography.bodyMd,

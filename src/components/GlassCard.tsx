@@ -1,19 +1,21 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Pressable } from 'react-native';
+import { View, StyleSheet, ViewStyle, Pressable, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { colors } from '../theme/colors';
 import { shadows } from '../theme/shadows';
+import { radius } from '../theme/radius';
 
 interface GlassCardProps {
   children: React.ReactNode;
   style?: ViewStyle;
-  /** Subtle emerald/amber tinted border variant */
   variant?: 'default' | 'elevated' | 'inset' | 'accent' | 'success' | 'warning' | 'error';
   /** @deprecated use GradientBorderCard instead */
   gradient?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
   padding?: number;
+  blur?: boolean;
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({
@@ -24,12 +26,12 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   onPress,
   onLongPress,
   padding,
+  blur = false,
 }) => {
-  // Legacy gradient support
   if (gradient) {
     return (
       <LinearGradient
-        colors={['rgba(16,185,129,0.08)', 'rgba(59,130,246,0.06)']}
+        colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.base, style]}
@@ -38,6 +40,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       </LinearGradient>
     );
   }
+
   const cardStyle = [
     styles.base,
     variant === 'elevated' && styles.elevated,
@@ -50,6 +53,10 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     style,
   ];
 
+  const inner = blur && Platform.OS === 'ios' ? (
+    <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+  ) : null;
+
   if (onPress || onLongPress) {
     return (
       <Pressable
@@ -59,17 +66,22 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           ...cardStyle,
           pressed && styles.pressed,
         ]}
-        android_ripple={{ color: 'rgba(240,244,248,0.04)' }}
+        android_ripple={{ color: 'rgba(255,255,255,0.06)' }}
       >
+        {inner}
         {children}
       </Pressable>
     );
   }
 
-  return <View style={cardStyle}>{children}</View>;
+  return (
+    <View style={cardStyle}>
+      {inner}
+      {children}
+    </View>
+  );
 };
 
-// Gradient border card — premium highlight effect
 interface GradientCardProps {
   children: React.ReactNode;
   style?: ViewStyle;
@@ -79,7 +91,7 @@ interface GradientCardProps {
 export const GradientBorderCard: React.FC<GradientCardProps> = ({
   children,
   style,
-  colors: gradientColors = ['rgba(16,185,129,0.3)', 'rgba(59,130,246,0.2)'],
+  colors: gradientColors = ['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.06)'],
 }) => (
   <LinearGradient
     colors={gradientColors}
@@ -94,15 +106,15 @@ export const GradientBorderCard: React.FC<GradientCardProps> = ({
 const styles = StyleSheet.create({
   base: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     overflow: 'hidden',
     ...shadows.md,
   },
   elevated: {
     backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border.strong,
+    borderColor: colors.border.default,
     ...shadows.lg,
   },
   inset: {
@@ -114,28 +126,25 @@ const styles = StyleSheet.create({
     borderColor: colors.border.accent,
   },
   success: {
-    borderColor: 'rgba(16,185,129,0.25)',
-    backgroundColor: colors.surface,
+    borderColor: 'rgba(48,209,88,0.28)',
   },
   warning: {
-    borderColor: 'rgba(245,158,11,0.25)',
-    backgroundColor: colors.surface,
+    borderColor: 'rgba(255,159,10,0.28)',
   },
   error: {
-    borderColor: 'rgba(239,68,68,0.25)',
-    backgroundColor: colors.surface,
+    borderColor: colors.border.alert,
   },
   pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.88,
+    transform: [{ scale: 0.985 }],
   },
   gradientOuter: {
-    borderRadius: 17,
+    borderRadius: radius.card + 1,
     padding: 1,
   },
   gradientInner: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.card,
     overflow: 'hidden',
   },
 });

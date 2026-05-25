@@ -7,6 +7,7 @@ import { useAuthStore } from './authStore';
 import { useFleetStore } from './fleetStore';
 import { formatSpeed } from '../utils/units';
 import { usePrefsStore } from './prefsStore';
+import { resolveAddressForPosition, isLocationQuestion, preferAddressInText } from '../utils/address';
 
 export interface CompanionMessage {
   id: string;
@@ -43,7 +44,19 @@ function buildWelcomeMessage(deviceName: string): CompanionMessage {
   };
 }
 
-function buildDeviceContext(deviceId: number): string {
+async function resolveDeviceAddress(deviceId: number): Promise<string | null> {
+  const device = useFleetStore.getState().devices.find(d => d.id === deviceId);
+  if (!device?.position) return null;
+
+  let address = device.address || device.position.address || null;
+  if (!address) {
+    address = await resolveAddressForPosition(device.position);
+    if (address) useFleetStore.getState().updateDeviceAddress(deviceId, address);
+  }
+  return address;
+}
+
+async function buildDeviceContext(deviceId: number): Promise<string> {
   const device = useFleetStore.getState().devices.find(d => d.id === deviceId);
   if (!device) return `Vehicle: ${deviceId}`;
 
@@ -52,12 +65,20 @@ function buildDeviceContext(deviceId: number): string {
   const parts = [
     `Vehicle: ${device.name} (${device.uniqueId})`,
     `Status: ${device.isMoving ? 'Moving' : device.computedStatus}`,
+    'IMPORTANT: When answering location questions, use the street address below. Never reply with latitude, longitude, or raw coordinates.',
   ];
 
   if (pos) {
     parts.push(`Speed: ${formatSpeed(pos.speed, prefs.speedUnit)}`);
-    parts.push(`Location: ${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`);
-    if (device.address) parts.push(`Address: ${device.address}`);
+
+    const address = await resolveDeviceAddress(deviceId);
+    if (address) {
+      parts.push(`Address: ${address}`);
+      parts.push(`Current location (human-readable): ${address}`);
+    } else {
+      parts.push('Address: unavailable — say location could not be resolved yet.');
+    }
+
     parts.push(`Last update: ${new Date(pos.fixTime).toLocaleString()}`);
   }
 
@@ -126,21 +147,44 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
     const userId = user?.email ?? (user?.id ? String(user.id) : undefined);
 
     try {
+      if (isLocationQuestion(trimmed)) {
+        const address = await resolveDeviceAddress(deviceId);
+        if (address) {
+          const directAnswer = `${deviceName} is currently at:\n${address}`;
+          set(state => ({
+            sending: false,
+            messages: state.messages.map(msg =>
+              msg.id === assistantId
+                ? {
+                    ...msg,
+                    streaming: false,
+                    text: directAnswer,
+                    blocks: [{ type: 'text', content: directAnswer }],
+                  }
+                : msg
+            ),
+          }));
+          return;
+        }
+      }
+
+      const context = await buildDeviceContext(deviceId);
+      const knownAddress = await resolveDeviceAddress(deviceId);
       const result = await sendCompanionChat({
         message: trimmed,
         deviceId,
         deviceName,
         threadId: threadId ?? undefined,
         userId,
-        context: buildDeviceContext(deviceId),
+        context,
         onToken: (_token, accumulated) => {
           set(state => ({
             messages: state.messages.map(msg =>
               msg.id === assistantId
                 ? {
                     ...msg,
-                    text: accumulated,
-                    blocks: [{ type: 'text', content: accumulated }],
+                    text: preferAddressInText(accumulated, knownAddress),
+                    blocks: [{ type: 'text', content: preferAddressInText(accumulated, knownAddress) }],
                   }
                 : msg
             ),
@@ -156,10 +200,14 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
             ? {
                 ...msg,
                 streaming: false,
-                text: result.rawText,
+                text: preferAddressInText(result.rawText, knownAddress),
                 blocks: result.blocks.length > 0
-                  ? result.blocks
-                  : [{ type: 'text', content: result.rawText || 'No response received.' }],
+                  ? result.blocks.map(block =>
+                      block.type === 'text'
+                        ? { ...block, content: preferAddressInText(block.content, knownAddress) }
+                        : block
+                    )
+                  : [{ type: 'text', content: preferAddressInText(result.rawText || 'No response received.', knownAddress) }],
               }
             : msg
         ),

@@ -11,10 +11,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
+import { shadows } from '../../theme/shadows';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'brand';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
@@ -69,11 +70,12 @@ export const Button: React.FC<ButtonProps> = ({
           fullWidth && styles.fullWidth,
           isDisabled && styles.disabled,
           pressed && styles.pressed,
+          shadows.button,
           style,
         ]}
       >
         <LinearGradient
-          colors={[colors.primary, colors.primaryLight]}
+          colors={colors.gradient.cta}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[StyleSheet.absoluteFill, styles.gradientFill]}
@@ -85,6 +87,44 @@ export const Button: React.FC<ButtonProps> = ({
             <>
               {icon && <View style={styles.iconLeft}>{icon}</View>}
               <Text style={[styles.text, styles.textPrimary, sizeText, textStyle]}>
+                {title}
+              </Text>
+              {iconRight && <View style={styles.iconRight}>{iconRight}</View>}
+            </>
+          )}
+        </View>
+      </Pressable>
+    );
+  }
+
+  if (variant === 'brand') {
+    return (
+      <Pressable
+        onPress={handlePress}
+        disabled={isDisabled}
+        style={({ pressed }) => [
+          styles.base,
+          sizeStyle,
+          fullWidth && styles.fullWidth,
+          isDisabled && styles.disabled,
+          pressed && styles.pressed,
+          shadows.brand,
+          style,
+        ]}
+      >
+        <LinearGradient
+          colors={colors.gradient.brand}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[StyleSheet.absoluteFill, styles.gradientFill]}
+        />
+        <View style={styles.content}>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              {icon && <View style={styles.iconLeft}>{icon}</View>}
+              <Text style={[styles.text, styles.textBrand, sizeText, textStyle]}>
                 {title}
               </Text>
               {iconRight && <View style={styles.iconRight}>{iconRight}</View>}
@@ -145,7 +185,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 12,
+    borderRadius: radius.button,
     overflow: 'hidden',
     alignSelf: 'flex-start',
   },
@@ -155,7 +195,7 @@ const styles = StyleSheet.create({
   sm: {
     height: 36,
     paddingHorizontal: spacing.md,
-    borderRadius: 10,
+    borderRadius: radius.sm,
   },
   md: {
     height: spacing.buttonHeight,
@@ -164,10 +204,10 @@ const styles = StyleSheet.create({
   lg: {
     height: 56,
     paddingHorizontal: spacing.xl,
-    borderRadius: 14,
+    borderRadius: radius.lg,
   },
   gradientFill: {
-    borderRadius: 12,
+    borderRadius: radius.button,
   },
   content: {
     flex: 1,
@@ -180,10 +220,14 @@ const styles = StyleSheet.create({
   iconRight: {},
   text: {
     fontWeight: '600',
-    letterSpacing: 0.1,
+    letterSpacing: -0.2,
   },
   textPrimary: {
     color: colors.text.inverse,
+    fontSize: 15,
+  },
+  textBrand: {
+    color: '#FFFFFF',
     fontSize: 15,
   },
   textSecondary: {
@@ -199,7 +243,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   textOutline: {
-    color: colors.primary,
+    color: colors.text.primary,
     fontSize: 15,
   },
   textSm: {
@@ -209,7 +253,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   textLg: {
-    fontSize: 16,
+    fontSize: 17,
   },
   secondary: {
     backgroundColor: colors.surfaceElevated,
@@ -222,17 +266,18 @@ const styles = StyleSheet.create({
   danger: {
     backgroundColor: colors.errorMuted,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.2)',
+    borderColor: colors.border.alert,
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.border.strong,
   },
   disabled: {
     opacity: 0.4,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }],
   },
 });

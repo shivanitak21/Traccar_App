@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { radius } from '../../theme/radius';
 
 type ChipVariant = 'online' | 'offline' | 'moving' | 'idle' | 'warning' | 'error' | 'info' | 'neutral';
 
@@ -20,9 +21,9 @@ const variantConfig: Record<ChipVariant, { bg: string; text: string; dot: string
     dot: colors.success,
   },
   offline: {
-    bg: 'rgba(100,116,139,0.12)',
-    text: '#94a3b8',
-    dot: '#64748b',
+    bg: 'rgba(142,142,147,0.14)',
+    text: colors.status.offline,
+    dot: colors.status.offline,
   },
   moving: {
     bg: colors.blueMuted,
@@ -45,12 +46,12 @@ const variantConfig: Record<ChipVariant, { bg: string; text: string; dot: string
     dot: colors.error,
   },
   info: {
-    bg: colors.blueMuted,
-    text: colors.blue,
-    dot: colors.blue,
+    bg: colors.infoMuted,
+    text: colors.info,
+    dot: colors.info,
   },
   neutral: {
-    bg: colors.border.default,
+    bg: colors.accentMuted,
     text: colors.text.secondary,
     dot: colors.text.tertiary,
   },
@@ -103,7 +104,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: radius.pill,
     gap: 5,
     alignSelf: 'flex-start',
   },
@@ -124,6 +125,7 @@ const styles = StyleSheet.create({
   label: {
     ...typography.smallMd,
     fontWeight: '600',
+    letterSpacing: 0.1,
   },
   labelSmall: {
     fontSize: 11,

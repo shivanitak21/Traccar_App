@@ -1,7 +1,6 @@
-import { Platform, ViewStyle } from 'react-native';
+import { ViewStyle } from 'react-native';
 import { colors } from './colors';
 
-// Layered shadow system — creates depth without being heavy
 const shadow = (
   color: string,
   offset: { width: number; height: number },
@@ -19,48 +18,52 @@ const shadow = (
 export const shadows = {
   none: {} as ViewStyle,
 
-  // Subtle lift — cards resting on background
   sm: {
-    ...shadow('#000', { width: 0, height: 1 }, 0.2, 3, 2),
+    ...shadow('#000', { width: 0, height: 1 }, 0.35, 4, 2),
   } as ViewStyle,
 
-  // Default card elevation
   md: {
-    ...shadow('#000', { width: 0, height: 2 }, 0.25, 6, 4),
+    ...shadow('#000', { width: 0, height: 4 }, 0.45, 12, 6),
   } as ViewStyle,
 
-  // Elevated cards / modals
   lg: {
-    ...shadow('#000', { width: 0, height: 4 }, 0.3, 12, 8),
+    ...shadow('#000', { width: 0, height: 8 }, 0.55, 24, 12),
   } as ViewStyle,
 
-  // Floating panels / bottom sheets
   xl: {
-    ...shadow('#000', { width: 0, height: 8 }, 0.35, 20, 16),
+    ...shadow('#000', { width: 0, height: 16 }, 0.65, 40, 20),
   } as ViewStyle,
 
-  // Emerald glow — active/online vehicles
   emerald: {
-    ...shadow(colors.primary, { width: 0, height: 0 }, 0.3, 12, 6),
+    ...shadow(colors.success, { width: 0, height: 0 }, 0.35, 16, 8),
   } as ViewStyle,
 
-  // Amber glow — warnings / idle
   amber: {
-    ...shadow(colors.accent, { width: 0, height: 0 }, 0.3, 12, 6),
+    ...shadow(colors.warning, { width: 0, height: 0 }, 0.35, 16, 8),
   } as ViewStyle,
 
-  // Red glow — alerts / errors
+  warm: {
+    ...shadow(colors.error, { width: 0, height: 0 }, 0.35, 16, 8),
+  } as ViewStyle,
+
+  /** @deprecated use shadows.warm */
   red: {
-    ...shadow(colors.error, { width: 0, height: 0 }, 0.3, 12, 6),
+    ...shadow(colors.error, { width: 0, height: 0 }, 0.35, 16, 8),
   } as ViewStyle,
 
-  // Tab bar top shadow
+  brand: {
+    ...shadow(colors.primary, { width: 0, height: 4 }, 0.35, 16, 8),
+  } as ViewStyle,
+
   tabBar: {
-    ...shadow('#000', { width: 0, height: -2 }, 0.3, 8, 8),
+    ...shadow('#000', { width: 0, height: 8 }, 0.5, 24, 16),
   } as ViewStyle,
 
-  // Button press state
   button: {
-    ...shadow(colors.primary, { width: 0, height: 4 }, 0.25, 8, 4),
+    ...shadow('#000', { width: 0, height: 4 }, 0.4, 12, 6),
+  } as ViewStyle,
+
+  float: {
+    ...shadow('#000', { width: 0, height: 12 }, 0.6, 32, 20),
   } as ViewStyle,
 };

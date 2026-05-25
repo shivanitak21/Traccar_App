@@ -15,10 +15,8 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Search,
-  SlidersHorizontal,
   Navigation,
   MapPin,
   Power,
@@ -30,10 +28,14 @@ import {
   Info,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { ControlButton, ControlButtonRow } from '../components/ui/ControlButton';
 import { StatusChip } from '../components/ui/StatusChip';
 import { DeviceCardSkeleton } from '../components/ui/SkeletonLoader';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
@@ -42,6 +44,7 @@ import { useFleetStore, DeviceWithPosition } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { useCompanionStore } from '../stores/companionStore';
 import { formatSpeed } from '../utils/units';
+import { getLocationLabel } from '../utils/address';
 
 type FilterType = 'all' | 'online' | 'offline' | 'moving' | 'idle';
 
@@ -122,23 +125,11 @@ export const DevicesScreen: React.FC = () => {
   ), [router, openCompanion]);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0c12', '#0d0f14']}
-        style={StyleSheet.absoluteFill}
-      />
-
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Vehicles</Text>
-            <Pressable style={styles.filterButton}>
-              <SlidersHorizontal size={18} color={colors.text.secondary} strokeWidth={1.8} />
-            </Pressable>
-          </View>
+          <ScreenHeader title="Vehicles" large={false} />
 
-          {/* Search */}
           <View style={styles.searchBar}>
             <Search size={16} color={colors.text.tertiary} strokeWidth={1.8} />
             <TextInput
@@ -157,37 +148,17 @@ export const DevicesScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Filter chips */}
-          <FlashList
-            data={FILTER_TABS}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterList}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setFilter(item.key);
-                }}
-                style={[
-                  styles.filterChip,
-                  filter === item.key && styles.filterChipActive,
-                ]}
-              >
-                <Text style={[
-                  styles.filterChipText,
-                  filter === item.key && styles.filterChipTextActive,
-                ]}>
-                  {item.label}
-                </Text>
-                {filter === item.key && (
-                  <Text style={styles.filterCount}>
-                    {' '}{filteredDevices.length}
-                  </Text>
-                )}
-              </Pressable>
-            )}
-          />
+          <View style={styles.filterWrap}>
+            <SegmentedControl
+              options={FILTER_TABS.map(tab => ({
+                key: tab.key,
+                label: tab.label,
+                count: filter === tab.key ? filteredDevices.length : undefined,
+              }))}
+              value={filter}
+              onChange={setFilter}
+            />
+          </View>
         </View>
 
         {/* List */}
@@ -205,7 +176,7 @@ export const DevicesScreen: React.FC = () => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={() => loadDevices(true)}
-                tintColor={colors.primary}
+                tintColor={colors.text.primary}
               />
             }
             ListEmptyComponent={
@@ -220,7 +191,7 @@ export const DevicesScreen: React.FC = () => {
           />
         )}
       </SafeAreaView>
-    </View>
+    </ScreenBackground>
   );
 };
 
@@ -268,18 +239,20 @@ const DeviceListItem: React.FC<{
 
           <View style={diStyles.info}>
             <Text style={diStyles.name} numberOfLines={1}>{device.name}</Text>
-            <View style={diStyles.meta}>
-              <Text style={diStyles.id}>{device.uniqueId}</Text>
-              {device.position?.latitude && (
-                <>
-                  <Text style={diStyles.dot}>·</Text>
-                  <MapPin size={10} color={colors.text.tertiary} strokeWidth={2} />
-                  <Text style={diStyles.coords} numberOfLines={1}>
-                    {device.position.latitude.toFixed(4)}, {device.position.longitude.toFixed(4)}
-                  </Text>
-                </>
-              )}
-            </View>
+            <Text style={diStyles.id}>{device.uniqueId}</Text>
+            {(device.address || device.position?.latitude) && (
+              <View style={diStyles.locationRow}>
+                <MapPin size={10} color={colors.text.tertiary} strokeWidth={2} />
+                <Text style={diStyles.coords} numberOfLines={2}>
+                  {getLocationLabel({
+                    address: device.address,
+                    positionAddress: device.position?.address,
+                    latitude: device.position?.latitude,
+                    longitude: device.position?.longitude,
+                  })}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={diStyles.rightSection}>
@@ -323,89 +296,52 @@ const DeviceListItem: React.FC<{
       {/* Expanded actions */}
       {expanded && (
         <View style={diStyles.actions}>
-          <DeviceAction
-            icon={<Navigation size={16} color={colors.primary} strokeWidth={1.8} />}
-            label="Live Track"
-            onPress={onLiveTrack}
-            accent={colors.primary}
-          />
-          <DeviceAction
-            icon={<History size={16} color={colors.blue} strokeWidth={1.8} />}
-            label="Playback"
-            onPress={onPlayback}
-            accent={colors.blue}
-          />
-          <DeviceAction
-            icon={<Map size={16} color={colors.accent} strokeWidth={1.8} />}
-            label="Geofence"
-            onPress={onGeofence}
-            accent={colors.accent}
-          />
-          <DeviceAction
-            icon={<Terminal size={16} color={colors.text.secondary} strokeWidth={1.8} />}
-            label="Commands"
-            onPress={onCommands}
-            accent={colors.text.secondary}
-          />
-          <DeviceAction
-            icon={<Info size={16} color={colors.text.secondary} strokeWidth={1.8} />}
-            label="Details"
-            onPress={onInfo}
-            accent={colors.text.secondary}
-          />
+          <ControlButtonRow>
+            <ControlButton
+              size="sm"
+              icon={<Navigation size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Live"
+              onPress={onLiveTrack}
+            />
+            <ControlButton
+              size="sm"
+              icon={<History size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Playback"
+              onPress={onPlayback}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Map size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Geofence"
+              onPress={onGeofence}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Terminal size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Commands"
+              onPress={onCommands}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Info size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Details"
+              onPress={onInfo}
+            />
+          </ControlButtonRow>
         </View>
       )}
     </View>
   );
 };
 
-const DeviceAction: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-  accent: string;
-}> = ({ icon, label, onPress, accent }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      daStyles.btn,
-      { borderColor: `${accent}25` },
-      pressed && daStyles.pressed,
-    ]}
-  >
-    {icon}
-    <Text style={[daStyles.label, { color: accent }]}>{label}</Text>
-  </Pressable>
-);
-
-const daStyles = StyleSheet.create({
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-  },
-  label: {
-    ...typography.smallMd,
-    fontSize: 12,
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-});
-
 const diStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.card,
     marginHorizontal: spacing.screenPadding,
-    marginBottom: 8,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     overflow: 'hidden',
   },
   statusBar: {
@@ -443,6 +379,12 @@ const diStyles = StyleSheet.create({
   info: {
     flex: 1,
     gap: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+    marginTop: 2,
   },
   name: {
     ...typography.bodyMd,
@@ -482,65 +424,33 @@ const diStyles = StyleSheet.create({
     fontWeight: '600',
   },
   actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
     paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingBottom: 16,
+    paddingTop: 4,
   },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   safeArea: {
     flex: 1,
   },
 
-  // Header
   header: {
-    paddingTop: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.screenPadding,
-    marginBottom: 14,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.text.primary,
-  },
-  filterButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingBottom: 8,
   },
 
-  // Search
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    marginHorizontal: spacing.screenPadding,
-    paddingHorizontal: 14,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   searchInput: {
     flex: 1,
@@ -553,42 +463,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Filter chips
-  filterList: {
-    paddingHorizontal: spacing.screenPadding,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    marginRight: 8,
-  },
-  filterChipActive: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: 'rgba(16,185,129,0.3)',
-  },
-  filterChipText: {
-    ...typography.smallMd,
-    color: colors.text.tertiary,
-  },
-  filterChipTextActive: {
-    color: colors.primary,
-  },
-  filterCount: {
-    ...typography.smallMd,
-    color: colors.primary,
+  filterWrap: {
+    marginBottom: 8,
   },
 
-  // List
   listContent: {
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 120,
   },
   skeletonList: {
     padding: spacing.screenPadding,

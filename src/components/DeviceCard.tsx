@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from './GlassCard';
+import { ControlButton, ControlButtonRow } from './ui/ControlButton';
+import { StatusChip } from './ui/StatusChip';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { radius } from '../theme/radius';
 import { TraccarDevice } from '../api/traccar';
-import { Navigation, Circle, Play, MapPinned, Info, Radio } from 'lucide-react-native';
+import { Navigation, Play, MapPinned, Info, Radio } from 'lucide-react-native';
 import { getVehicleImageUrl } from '../utils/vehicleImages';
 
 interface DeviceCardProps {
@@ -19,7 +23,6 @@ interface DeviceCardProps {
 
 export const DeviceCard: React.FC<DeviceCardProps> = ({
   device,
-  index,
   onLiveTrack,
   onPlayback,
   onGeofence,
@@ -27,7 +30,6 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   onCommands,
 }) => {
   const isOnline = device.status === 'online';
-  const statusColor = isOnline ? colors.success : colors.text.tertiary;
   const vehicleImageUrl = getVehicleImageUrl(device.model, device.name);
   const [imageError, setImageError] = React.useState(false);
   const [imageLoading, setImageLoading] = React.useState(true);
@@ -37,14 +39,13 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
       <View style={styles.imageContainer}>
         {imageError ? (
           <View style={[styles.vehicleImage, styles.placeholderContainer]}>
-            <Navigation color={colors.primary} size={64} strokeWidth={1.5} />
-            <Text style={styles.placeholderText}>{device.name}</Text>
+            <Navigation color={colors.text.secondary} size={72} strokeWidth={1.2} />
           </View>
         ) : (
           <>
             {imageLoading && (
               <View style={[styles.vehicleImage, styles.loadingContainer]}>
-                <Navigation color={colors.primary} size={48} strokeWidth={1.5} />
+                <Navigation color={colors.text.tertiary} size={48} strokeWidth={1.5} />
               </View>
             )}
             <Image
@@ -59,18 +60,21 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
             />
           </>
         )}
+        <LinearGradient
+          colors={colors.gradient.hero}
+          style={styles.imageGradient}
+        />
         <View style={styles.imageOverlay}>
           <View style={styles.header}>
             <View style={styles.info}>
               <Text style={styles.name}>{device.name}</Text>
               <Text style={styles.uniqueId}>{device.uniqueId}</Text>
             </View>
-            <View style={styles.status}>
-              <Circle color={statusColor} size={12} fill={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {isOnline ? 'Online' : 'Offline'}
-              </Text>
-            </View>
+            <StatusChip
+              label={isOnline ? 'Online' : 'Offline'}
+              variant={isOnline ? 'online' : 'offline'}
+              size="sm"
+            />
           </View>
         </View>
       </View>
@@ -78,36 +82,39 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
       {device.lastUpdate && (
         <View style={styles.footer}>
           <Text style={styles.lastUpdate}>
-            Last update: {new Date(device.lastUpdate).toLocaleString()}
+            Updated {new Date(device.lastUpdate).toLocaleString()}
           </Text>
         </View>
       )}
 
       <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={onLiveTrack}>
-          <Navigation color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Live</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onPlayback}>
-          <Play color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Playback</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onGeofence}>
-          <MapPinned color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Geofence</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onDeviceInfo}>
-          <Info color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Info</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onCommands}>
-          <Radio color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Commands</Text>
-        </TouchableOpacity>
+        <ControlButtonRow>
+          <ControlButton
+            icon={<Navigation size={20} color={colors.text.primary} strokeWidth={1.8} />}
+            label="Live"
+            onPress={onLiveTrack}
+          />
+          <ControlButton
+            icon={<Play size={20} color={colors.text.primary} strokeWidth={1.8} />}
+            label="Playback"
+            onPress={onPlayback}
+          />
+          <ControlButton
+            icon={<MapPinned size={20} color={colors.text.primary} strokeWidth={1.8} />}
+            label="Geofence"
+            onPress={onGeofence}
+          />
+          <ControlButton
+            icon={<Info size={20} color={colors.text.primary} strokeWidth={1.8} />}
+            label="Info"
+            onPress={onDeviceInfo}
+          />
+          <ControlButton
+            icon={<Radio size={20} color={colors.text.primary} strokeWidth={1.8} />}
+            label="Commands"
+            onPress={onCommands}
+          />
+        </ControlButtonRow>
       </View>
     </GlassCard>
   );
@@ -115,32 +122,27 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 16,
+    marginBottom: 20,
     padding: 0,
     overflow: 'hidden',
   },
   imageContainer: {
     width: '100%',
-    height: 280,
+    height: 300,
     position: 'relative',
+    backgroundColor: colors.backgroundSecondary,
   },
   vehicleImage: {
     width: '100%',
     height: '100%',
   },
   placeholderContainer: {
-    backgroundColor: colors.primaryGlow,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderText: {
-    ...typography.body,
-    color: colors.text.primary,
-    marginTop: 12,
-    fontWeight: '600',
-  },
   loadingContainer: {
-    backgroundColor: colors.primaryGlow,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
@@ -152,77 +154,52 @@ const styles = StyleSheet.create({
   hidden: {
     opacity: 0,
   },
+  imageGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '55%',
+  },
   imageOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 16,
-    paddingTop: 8,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: 12,
   },
   info: {
     flex: 1,
   },
   name: {
-    ...typography.body,
+    ...typography.h3,
     color: colors.text.primary,
-    fontWeight: '600',
     marginBottom: 4,
   },
   uniqueId: {
-    ...typography.small,
-    color: colors.text.tertiary,
-  },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusText: {
-    ...typography.small,
-    fontWeight: '500',
-  },
-  footer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: 'rgba(26, 26, 46, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
-  },
-  lastUpdate: {
-    ...typography.small,
+    ...typography.caption,
     color: colors.text.secondary,
   },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border.subtle,
+  },
+  lastUpdate: {
+    ...typography.caption,
+    color: colors.text.tertiary,
+  },
   actionsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingTop: 12,
+    paddingTop: 16,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: 'rgba(26, 26, 46, 0.95)',
-  },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 243, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    gap: 4,
-  },
-  actionText: {
-    ...typography.small,
-    color: colors.text.primary,
-    fontSize: 10,
-    fontWeight: '600',
+    paddingBottom: 20,
   },
 });

@@ -9,7 +9,7 @@ const CHART_HEIGHT = 180;
 const CHART_WIDTH = 320;
 const PADDING = { top: 16, right: 12, bottom: 28, left: 36 };
 
-const palette = colors.chart ?? ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
+const palette = colors.chart;
 
 export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart }) => {
   const plot = useMemo(() => {

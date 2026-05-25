@@ -9,7 +9,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Bell,
   AlertTriangle,
@@ -25,7 +24,10 @@ import {
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
-import { StatusChip } from '../components/ui/StatusChip';
+import { radius } from '../theme/radius';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { traccarAPI, TraccarEvent } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
@@ -133,26 +135,26 @@ export const AlertsScreen: React.FC = () => {
   const warnCount = events.filter(e => ['geofenceExit', 'maintenance'].includes(e.type)).length;
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
-
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
         <Animated.View entering={FadeInDown.delay(0).duration(450)} style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Alerts</Text>
-            <View style={styles.headerRight}>
-              {alertCount > 0 && (
-                <View style={styles.criticalBadge}>
-                  <AlertTriangle size={12} color={colors.error} strokeWidth={2.5} />
-                  <Text style={styles.criticalCount}>{alertCount}</Text>
-                </View>
-              )}
-              <Pressable style={styles.filterBtn}>
-                <Filter size={16} color={colors.text.secondary} strokeWidth={1.8} />
-              </Pressable>
-            </View>
-          </View>
+          <ScreenHeader
+            title="Alerts"
+            large={false}
+            right={
+              <>
+                {alertCount > 0 && (
+                  <View style={styles.criticalBadge}>
+                    <AlertTriangle size={12} color={colors.error} strokeWidth={2.5} />
+                    <Text style={styles.criticalCount}>{alertCount}</Text>
+                  </View>
+                )}
+                <Pressable style={styles.filterBtn}>
+                  <Filter size={16} color={colors.text.secondary} strokeWidth={1.8} />
+                </Pressable>
+              </>
+            }
+          />
 
           {/* Summary row */}
           {!loading && (
@@ -178,25 +180,12 @@ export const AlertsScreen: React.FC = () => {
             </Animated.View>
           )}
 
-          {/* Filter tabs */}
-          <View style={styles.filterTabs}>
-            {FILTER_TABS.map(tab => (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveFilter(tab.key)}
-                style={[
-                  styles.filterTab,
-                  activeFilter === tab.key && styles.filterTabActive,
-                ]}
-              >
-                <Text style={[
-                  styles.filterTabText,
-                  activeFilter === tab.key && styles.filterTabTextActive,
-                ]}>
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={styles.filterWrap}>
+            <SegmentedControl
+              options={FILTER_TABS.map(tab => ({ key: tab.key, label: tab.label }))}
+              value={activeFilter}
+              onChange={setActiveFilter}
+            />
           </View>
         </Animated.View>
 
@@ -217,7 +206,7 @@ export const AlertsScreen: React.FC = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => loadEvents(true)}
-              tintColor={colors.primary}
+              tintColor={colors.text.primary}
             />
           }
           ListEmptyComponent={
@@ -239,7 +228,7 @@ export const AlertsScreen: React.FC = () => {
           }
         />
       </SafeAreaView>
-    </View>
+    </ScreenBackground>
   );
 };
 
@@ -362,90 +351,49 @@ const EventSkeleton: React.FC = () => (
 );
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   safeArea: {
     flex: 1,
   },
   header: {
-    paddingTop: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-    paddingBottom: 0,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.screenPadding,
-    marginBottom: 12,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.text.primary,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    paddingBottom: 8,
   },
   criticalBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: colors.errorMuted,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.2)',
+    borderColor: colors.border.alert,
   },
   criticalCount: {
     ...typography.smallMd,
     color: colors.error,
   },
   filterBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
   summaryRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: spacing.screenPadding,
     marginBottom: 14,
     flexWrap: 'wrap',
   },
-  filterTabs: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
-    gap: 0,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  filterTabActive: {
-    borderBottomColor: colors.primary,
-  },
-  filterTabText: {
-    ...typography.captionMd,
-    color: colors.text.tertiary,
-  },
-  filterTabTextActive: {
-    color: colors.primary,
+  filterWrap: {
+    marginBottom: 8,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 120,
   },
   skeletonList: {},
   empty: {

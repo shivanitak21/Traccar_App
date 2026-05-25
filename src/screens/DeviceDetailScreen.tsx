@@ -14,6 +14,7 @@ import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { Navigation, MapPin, Clock, Activity, Gauge } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
+import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
 
 interface DeviceDetailScreenProps {
   route: {
@@ -28,6 +29,7 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
   const { prefs } = usePrefsStore();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,7 +45,10 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
 
       setDevice(deviceData);
       if (positionsData.length > 0) {
-        setPosition(positionsData[0]);
+        const latest = positionsData[0];
+        setPosition(latest);
+        const resolved = await resolveAddressForPosition(latest);
+        setAddress(resolved);
       }
     } catch (error) {
       console.error('Failed to load device detail:', error);
@@ -98,21 +103,17 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
                 <View style={styles.infoRow}>
                   <MapPin color={colors.primary} size={20} />
                   <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Coordinates</Text>
+                    <Text style={styles.infoLabel}>Address</Text>
                     <Text style={styles.infoValue}>
-                      {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
+                      {getLocationLabel({
+                        address,
+                        positionAddress: position.address,
+                        latitude: position.latitude,
+                        longitude: position.longitude,
+                      })}
                     </Text>
                   </View>
                 </View>
-                {position.address && (
-                  <View style={styles.infoRow}>
-                    <MapPin color={colors.secondary} size={20} />
-                    <View style={styles.infoContent}>
-                      <Text style={styles.infoLabel}>Address</Text>
-                      <Text style={styles.infoValue}>{position.address}</Text>
-                    </View>
-                  </View>
-                )}
               </GlassCard>
             </View>
 

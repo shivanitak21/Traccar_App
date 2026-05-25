@@ -9,6 +9,7 @@ import { WebMapView } from '../components/WebMapView';
 import { Navigation, Zap, MapPin, X } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
+import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,7 +24,13 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
   const [position, setPosition] = useState<TraccarPosition | null>(null);
   const [positionHistory, setPositionHistory] = useState<TraccarPosition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [address, setAddress] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  const updateAddress = async (pos: TraccarPosition) => {
+    const resolved = await resolveAddressForPosition(pos);
+    setAddress(resolved);
+  };
 
   const loadData = async () => {
     try {
@@ -39,6 +46,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
         setPosition(latestPosition);
         setPositionHistory(positions.slice(0, 30));
         setMapCenter({ latitude: latestPosition.latitude, longitude: latestPosition.longitude });
+        void updateAddress(latestPosition);
       }
     } catch (error) {
       console.error('Failed to load tracking data:', error);
@@ -58,6 +66,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
         setPosition(devicePosition);
         setPositionHistory(prev => [devicePosition, ...prev.slice(0, 29)]);
         setMapCenter({ latitude: devicePosition.latitude, longitude: devicePosition.longitude });
+        void updateAddress(devicePosition);
       }
     };
 
@@ -93,12 +102,19 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
       longitude: p.longitude,
     }));
 
+  const locationLabel = getLocationLabel({
+    address,
+    positionAddress: position.address,
+    latitude: position.latitude,
+    longitude: position.longitude,
+  });
+
   const markers = [{
     id: deviceId.toString(),
     latitude: position.latitude,
     longitude: position.longitude,
     title: device?.name || 'Unknown Device',
-    description: `${speedLabel} • Live Tracking`,
+    description: locationLabel,
     color: colors.primary,
     status: position.speed > 0 ? 'moving' : 'online',
     course: position.course || 0,
@@ -150,18 +166,12 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
 
             <View style={styles.stat}>
               <MapPin color={colors.secondary} size={20} />
-              <View>
-                <Text style={styles.statValue}>
-                  {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
-                </Text>
-                <Text style={styles.statLabel}>Coordinates</Text>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue} numberOfLines={2}>{locationLabel}</Text>
+                <Text style={styles.statLabel}>Location</Text>
               </View>
             </View>
           </View>
-
-          {position.address && (
-            <Text style={styles.address}>{position.address}</Text>
-          )}
 
           <Text style={styles.timestamp}>
             Last update: {new Date(position.fixTime).toLocaleString()}
@@ -244,8 +254,11 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
+  },
+  statContent: {
+    flex: 1,
   },
   statValue: {
     ...typography.small,

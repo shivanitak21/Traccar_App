@@ -19,12 +19,7 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
-import { traccarAPI, TraccarDevice, TraccarUser } from '../api/traccar';
-
-interface TraccarPermission {
-  userId?: number;
-  deviceId?: number;
-}
+import { traccarAPI, TraccarDevice, TraccarPermission, TraccarUser } from '../api/traccar';
 
 export const UserAccessScreen: React.FC = () => {
   const router = useRouter();
@@ -41,11 +36,11 @@ export const UserAccessScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [usersData, devicesData, permissionsData] = await Promise.all([
+      const [usersData, devicesData] = await Promise.all([
         traccarAPI.getUsers(),
         traccarAPI.getDevices(),
-        traccarAPI.getPermissions(),
       ]);
+      const permissionsData = await traccarAPI.getAllUserDevicePermissions(usersData);
       setUsers(usersData);
       setDevices(devicesData);
       setPermissions(permissionsData);

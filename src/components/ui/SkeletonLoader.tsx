@@ -105,11 +105,11 @@ const styles = StyleSheet.create({
 const skeletonStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     gap: 14,
   },
   row: {

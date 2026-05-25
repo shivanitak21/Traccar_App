@@ -14,6 +14,7 @@ import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed, formatDistance } from '../utils/units';
+import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
 import {
   Info,
   Activity,
@@ -38,6 +39,7 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
   const router = useRouter();
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -49,7 +51,10 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
 
       setDevice(deviceData);
       if (positions.length > 0) {
-        setPosition(positions[0]);
+        const latest = positions[0];
+        setPosition(latest);
+        const resolved = await resolveAddressForPosition(latest);
+        setAddress(resolved);
       }
     } catch (error) {
       console.error('Failed to load device info:', error);
@@ -163,15 +168,20 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
           <GlassCard style={styles.section}>
             <Text style={styles.sectionTitle}>Current Position</Text>
 
-            {position.address && (
-              <View style={styles.addressContainer}>
-                <MapPin color={colors.primary} size={20} />
-                <View style={styles.addressContent}>
-                  <Text style={styles.addressLabel}>Location:</Text>
-                  <Text style={styles.addressText}>{position.address}</Text>
-                </View>
+            <View style={styles.addressContainer}>
+              <MapPin color={colors.primary} size={20} />
+              <View style={styles.addressContent}>
+                <Text style={styles.addressLabel}>Location:</Text>
+                <Text style={styles.addressText}>
+                  {getLocationLabel({
+                    address,
+                    positionAddress: position.address,
+                    latitude: position.latitude,
+                    longitude: position.longitude,
+                  })}
+                </Text>
               </View>
-            )}
+            </View>
 
             <View style={styles.sensorGrid}>
 

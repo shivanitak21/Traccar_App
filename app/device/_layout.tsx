@@ -4,8 +4,9 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { user, hasHydrated, isAuthenticated } = useAuthStore();
+export default function DeviceLayout() {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const hasHydrated = useAuthStore(state => state.hasHydrated);
 
   if (!hasHydrated) {
     return (
@@ -19,23 +20,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
     return <Redirect href="/login" />;
   }
 
-  if (!user?.administrator) {
-    return <Redirect href="/(tabs)/settings" />;
-  }
-
-  return <>{children}</>;
-}
-
-export default function AdminLayout() {
-  return (
-    <AdminGuard>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="drivers" />
-        <Stack.Screen name="vehicles" />
-        <Stack.Screen name="users" />
-      </Stack>
-    </AdminGuard>
-  );
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 const styles = StyleSheet.create({

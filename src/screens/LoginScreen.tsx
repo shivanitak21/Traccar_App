@@ -10,13 +10,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
   FadeInDown,
   FadeIn,
 } from 'react-native-reanimated';
@@ -25,7 +19,9 @@ import { Eye, EyeOff, Lock, Mail, Server, ChevronRight } from 'lucide-react-nati
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
 import { shadows } from '../theme/shadows';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { useAuthStore } from '../stores/authStore';
 import { API_CONFIG } from '../api/config';
 import { storage } from '../utils/storage';
@@ -67,19 +63,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Background gradient */}
-      <LinearGradient
-        colors={['#0a0c12', '#0d0f14', '#0f1520']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
-      {/* Subtle ambient glow */}
-      <View style={styles.glowTopLeft} />
-      <View style={styles.glowBottomRight} />
-
+    <ScreenBackground variant="hero">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -89,45 +73,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo & wordmark */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(600).springify()}
             style={styles.logoSection}
           >
             <View style={styles.logoMark}>
-              <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.logoGradient}
-              >
-                <Text style={styles.logoLetter}>E</Text>
-              </LinearGradient>
-              <View style={styles.logoPulse} />
+              <Text style={styles.logoLetter}>E</Text>
             </View>
-
-            <Text style={styles.wordmark}>Elevatics IoT</Text>
-            <Text style={styles.tagline}>Fleet Intelligence Platform</Text>
+            <Text style={styles.wordmark}>Elevatics</Text>
+            <Text style={styles.tagline}>Vehicle Intelligence</Text>
           </Animated.View>
 
-          {/* Login form card */}
           <Animated.View
             entering={FadeInDown.delay(250).duration(700).springify()}
             style={styles.formCard}
           >
             <Text style={styles.formTitle}>Sign in</Text>
-            <Text style={styles.formSubtitle}>Access your fleet dashboard</Text>
+            <Text style={styles.formSubtitle}>Connect to your fleet</Text>
 
-            {/* Server URL */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Server URL</Text>
+              <Text style={styles.fieldLabel}>Server</Text>
               <View style={[
                 styles.inputWrapper,
                 activeField === 'server' && styles.inputActive,
               ]}>
                 <Server
-                  size={17}
-                  color={activeField === 'server' ? colors.primary : colors.text.tertiary}
+                  size={18}
+                  color={activeField === 'server' ? colors.text.primary : colors.text.tertiary}
                   strokeWidth={1.8}
                 />
                 <TextInput
@@ -140,23 +112,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   keyboardType="url"
                   returnKeyType="next"
                   onSubmitEditing={() => emailRef.current?.focus()}
-                  placeholder="https://elevaticsiot.com"
+                  placeholder="https://your-server.com"
                   placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.primary}
+                  selectionColor={colors.text.primary}
                 />
               </View>
             </View>
 
-            {/* Email */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Email address</Text>
+              <Text style={styles.fieldLabel}>Email</Text>
               <View style={[
                 styles.inputWrapper,
                 activeField === 'email' && styles.inputActive,
               ]}>
                 <Mail
-                  size={17}
-                  color={activeField === 'email' ? colors.primary : colors.text.tertiary}
+                  size={18}
+                  color={activeField === 'email' ? colors.text.primary : colors.text.tertiary}
                   strokeWidth={1.8}
                 />
                 <TextInput
@@ -172,12 +143,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   onSubmitEditing={() => passwordRef.current?.focus()}
                   placeholder="admin@company.com"
                   placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.primary}
+                  selectionColor={colors.text.primary}
                 />
               </View>
             </View>
 
-            {/* Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Password</Text>
               <View style={[
@@ -185,8 +155,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 activeField === 'password' && styles.inputActive,
               ]}>
                 <Lock
-                  size={17}
-                  color={activeField === 'password' ? colors.primary : colors.text.tertiary}
+                  size={18}
+                  color={activeField === 'password' ? colors.text.primary : colors.text.tertiary}
                   strokeWidth={1.8}
                 />
                 <TextInput
@@ -201,28 +171,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   onSubmitEditing={handleLogin}
                   placeholder="••••••••"
                   placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.primary}
+                  selectionColor={colors.text.primary}
                 />
                 <Pressable
                   onPress={() => setShowPassword(v => !v)}
                   hitSlop={8}
                 >
                   {showPassword
-                    ? <Eye size={17} color={colors.text.tertiary} strokeWidth={1.8} />
-                    : <EyeOff size={17} color={colors.text.tertiary} strokeWidth={1.8} />
+                    ? <Eye size={18} color={colors.text.tertiary} strokeWidth={1.8} />
+                    : <EyeOff size={18} color={colors.text.tertiary} strokeWidth={1.8} />
                   }
                 </Pressable>
               </View>
             </View>
 
-            {/* Error message */}
             {error && (
               <Animated.View entering={FadeIn.duration(300)} style={styles.errorBanner}>
                 <Text style={styles.errorText}>{error}</Text>
               </Animated.View>
             )}
 
-            {/* Submit */}
             <Pressable
               onPress={handleLogin}
               disabled={isLoading}
@@ -232,46 +200,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 isLoading && styles.submitDisabled,
               ]}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitGradient}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#0d0f14" size="small" />
-                ) : (
-                  <View style={styles.submitContent}>
-                    <Text style={styles.submitText}>Sign in</Text>
-                    <ChevronRight size={18} color="#0d0f14" strokeWidth={2.5} />
-                  </View>
-                )}
-              </LinearGradient>
+              {isLoading ? (
+                <ActivityIndicator color={colors.text.inverse} size="small" />
+              ) : (
+                <View style={styles.submitContent}>
+                  <Text style={styles.submitText}>Continue</Text>
+                  <ChevronRight size={18} color={colors.text.inverse} strokeWidth={2.5} />
+                </View>
+              )}
             </Pressable>
           </Animated.View>
 
-          {/* Footer */}
           <Animated.View
             entering={FadeInDown.delay(450).duration(600)}
             style={styles.footer}
           >
             <Text style={styles.footerText}>
-              Powered by{' '}
-              <Text style={styles.footerBrand}>Traccar</Text>
-              {' '}· Enterprise Fleet Management
+              Powered by <Text style={styles.footerBrand}>Elevatics AI</Text>
             </Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </ScreenBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   keyboardView: {
     flex: 1,
   },
@@ -279,150 +233,112 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.screenPadding,
-    paddingVertical: 48,
+    paddingVertical: 56,
   },
 
-  // Ambient glows — subtle, not neon
-  glowTopLeft: {
-    position: 'absolute',
-    top: -80,
-    left: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(16,185,129,0.04)',
-  },
-  glowBottomRight: {
-    position: 'absolute',
-    bottom: -60,
-    right: -60,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(59,130,246,0.04)',
-  },
-
-  // Logo section
   logoSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
   },
   logoMark: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  logoGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: 72,
+    height: 72,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
+    ...shadows.lg,
   },
   logoLetter: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#0d0f14',
-    letterSpacing: -0.5,
-  },
-  logoPulse: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.2)',
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.text.primary,
+    letterSpacing: -1,
   },
   wordmark: {
+    ...typography.h1,
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  tagline: {
+    ...typography.body,
+    color: colors.text.tertiary,
+  },
+
+  formCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius['2xl'],
+    padding: 28,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    ...shadows.lg,
+    marginBottom: 32,
+  },
+  formTitle: {
     ...typography.h2,
     color: colors.text.primary,
     marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  tagline: {
-    ...typography.caption,
-    color: colors.text.tertiary,
-    letterSpacing: 0.5,
-  },
-
-  // Form card
-  formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    ...shadows.lg,
-    marginBottom: 24,
-  },
-  formTitle: {
-    ...typography.h3,
-    color: colors.text.primary,
-    marginBottom: 4,
   },
   formSubtitle: {
-    ...typography.caption,
+    ...typography.body,
     color: colors.text.tertiary,
-    marginBottom: 28,
+    marginBottom: 32,
   },
 
-  // Fields
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   fieldLabel: {
-    ...typography.smallMd,
+    ...typography.caption,
     color: colors.text.secondary,
     marginBottom: 8,
-    letterSpacing: 0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 4,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 4,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    gap: 10,
+    borderColor: colors.border.subtle,
+    gap: 12,
   },
   inputActive: {
     borderColor: colors.border.focus,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
   },
   input: {
     flex: 1,
-    ...typography.bodyMd,
+    ...typography.bodyLg,
     color: colors.text.primary,
-    paddingVertical: Platform.OS === 'android' ? 10 : 0,
+    paddingVertical: Platform.OS === 'android' ? 12 : 0,
   },
 
-  // Error
   errorBanner: {
     backgroundColor: colors.errorMuted,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: radius.md,
+    padding: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.2)',
+    borderColor: colors.border.alert,
   },
   errorText: {
     ...typography.caption,
     color: colors.error,
   },
 
-  // Submit
   submitButton: {
     marginTop: 8,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  submitGradient: {
-    height: 52,
+    borderRadius: radius.lg,
+    height: 56,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.button,
   },
   submitContent: {
     flexDirection: 'row',
@@ -430,10 +346,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   submitText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0d0f14',
-    letterSpacing: 0.1,
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.text.inverse,
+    letterSpacing: -0.2,
   },
   submitPressed: {
     transform: [{ scale: 0.98 }],
@@ -443,12 +359,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Footer
   footer: {
     alignItems: 'center',
   },
   footerText: {
-    ...typography.small,
+    ...typography.caption,
     color: colors.text.tertiary,
   },
   footerBrand: {

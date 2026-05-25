@@ -33,7 +33,10 @@ import {
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
 import { GlassCard } from '../components/GlassCard';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { StatusChip } from '../components/ui/StatusChip';
 import { traccarAPI, TraccarTrip, TraccarSummary, TraccarStop, TraccarEvent, TraccarPosition } from '../api/traccar';
 import { useFleetStore } from '../stores/fleetStore';
@@ -260,18 +263,18 @@ export const ReportsScreen: React.FC = () => {
   ];
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
-
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <Animated.View entering={FadeInDown.delay(0).duration(450)}>
-            <Text style={styles.title}>Reports</Text>
-            <Text style={styles.subtitle}>Analyze fleet performance and activity</Text>
+            <ScreenHeader
+              title="Reports"
+              subtitle="Fleet performance & activity"
+              large={false}
+            />
           </Animated.View>
 
           {/* Report type selector */}
@@ -291,19 +294,19 @@ export const ReportsScreen: React.FC = () => {
                     styles.reportTypeIcon,
                     {
                       backgroundColor: reportType === rt.key
-                        ? colors.primaryMuted
+                        ? colors.accentMuted
                         : colors.backgroundSecondary,
                     },
                   ]}>
                     <rt.icon
                       size={20}
-                      color={reportType === rt.key ? colors.primary : colors.text.tertiary}
+                      color={reportType === rt.key ? colors.text.primary : colors.text.tertiary}
                       strokeWidth={1.8}
                     />
                   </View>
                   <Text style={[
                     styles.reportTypeLabel,
-                    reportType === rt.key && { color: colors.primary },
+                    reportType === rt.key && { color: colors.text.primary },
                   ]}>
                     {rt.label}
                   </Text>
@@ -332,12 +335,12 @@ export const ReportsScreen: React.FC = () => {
                 >
                   <Navigation
                     size={14}
-                    color={selectedDeviceId === device.id ? colors.primary : colors.text.tertiary}
+                    color={selectedDeviceId === device.id ? colors.text.inverse : colors.text.tertiary}
                     strokeWidth={1.8}
                   />
                   <Text style={[
                     styles.vehicleChipText,
-                    selectedDeviceId === device.id && { color: colors.primary },
+                    selectedDeviceId === device.id && { color: colors.text.inverse },
                   ]}>
                     {device.name}
                   </Text>
@@ -370,7 +373,7 @@ export const ReportsScreen: React.FC = () => {
                 >
                   <Text style={[
                     styles.dateRangeText,
-                    dateRange === r.value && { color: colors.primary },
+                    dateRange === r.value && { color: colors.text.inverse },
                   ]}>
                     {r.label}
                   </Text>
@@ -391,7 +394,7 @@ export const ReportsScreen: React.FC = () => {
               ]}
             >
               <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
+                colors={colors.gradient.cta}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.runGradient}
@@ -496,7 +499,7 @@ export const ReportsScreen: React.FC = () => {
           )}
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </ScreenBackground>
   );
 };
 
@@ -846,20 +849,16 @@ const emStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
-  title: { ...typography.h2, color: colors.text.primary, marginBottom: 4 },
-  subtitle: { ...typography.caption, color: colors.text.tertiary, marginBottom: 24 },
-  section: { marginBottom: 24 },
+  section: { marginBottom: 28 },
   sectionLabel: {
-    ...typography.label,
+    ...typography.sectionLabel,
     color: colors.text.tertiary,
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   reportTypeGrid: {
@@ -870,20 +869,20 @@ const styles = StyleSheet.create({
   reportTypeCard: {
     width: '47%',
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: radius.card,
+    padding: 16,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    gap: 8,
+    borderColor: colors.border.subtle,
+    gap: 10,
   },
   reportTypeCardActive: {
-    borderColor: 'rgba(16,185,129,0.3)',
-    backgroundColor: 'rgba(16,185,129,0.05)',
+    borderColor: colors.border.strong,
+    backgroundColor: colors.surfaceElevated,
   },
   reportTypeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -913,8 +912,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   vehicleChipActive: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: 'rgba(16,185,129,0.3)',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   vehicleChipText: {
     ...typography.captionMd,
@@ -935,8 +934,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   dateRangeChipActive: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: 'rgba(16,185,129,0.3)',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   dateRangeText: {
     ...typography.captionMd,
