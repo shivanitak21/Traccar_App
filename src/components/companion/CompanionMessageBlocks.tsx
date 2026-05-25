@@ -5,6 +5,7 @@ import { typography } from '../../theme/typography';
 import { CompanionContentBlock } from '../../api/aiCompanion';
 import { CompanionChart } from './CompanionChart';
 import { CompanionTable } from './CompanionTable';
+import { CompanionMarkdown } from './CompanionMarkdown';
 
 interface CompanionMessageBlocksProps {
   blocks?: CompanionContentBlock[];
@@ -45,9 +46,9 @@ export const CompanionMessageBlocks: React.FC<CompanionMessageBlocksProps> = ({
             ) : null;
           }
           return (
-            <Text key={`text-${index}`} style={styles.text}>
+            <CompanionMarkdown key={`text-${index}`}>
               {block.content}
-            </Text>
+            </CompanionMarkdown>
           );
         }
 
@@ -76,11 +77,6 @@ export const CompanionMessageBlocks: React.FC<CompanionMessageBlocksProps> = ({
 const styles = StyleSheet.create({
   wrap: {
     gap: 10,
-  },
-  text: {
-    ...typography.body,
-    color: colors.text.primary,
-    lineHeight: 21,
   },
   blockCard: {
     backgroundColor: colors.background,

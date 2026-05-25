@@ -4,7 +4,7 @@
     "slug": "fleet-tracker",
     "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/elevactics_logo.png",
     "scheme": "fleet-tracker",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -23,7 +23,7 @@
     "android": {
       "package": "com.elevatics.fleet",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/elevactics_logo.png",
         "backgroundColor": "#0d0f14"
       },
       "permissions": [
@@ -35,7 +35,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/elevactics_logo.png"
     },
     "plugins": [
       "expo-router",

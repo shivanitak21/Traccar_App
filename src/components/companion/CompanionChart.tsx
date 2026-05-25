@@ -1,15 +1,21 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import Svg, { Polyline, Rect, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Polyline, Polygon, Rect, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { CompanionChartBlock } from '../../api/aiCompanion';
 
-const CHART_HEIGHT = 180;
+const CHART_HEIGHT = 190;
 const CHART_WIDTH = 320;
-const PADDING = { top: 16, right: 12, bottom: 28, left: 36 };
+const PADDING = { top: 20, right: 14, bottom: 34, left: 42 };
 
 const palette = colors.chart;
+
+function formatValue(v: number): string {
+  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(1);
+}
 
 export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart }) => {
   const plot = useMemo(() => {
@@ -23,7 +29,7 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
 
     const innerWidth = CHART_WIDTH - PADDING.left - PADDING.right;
     const innerHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom;
-    const stepX = chart.labels.length > 1 ? innerWidth / (chart.labels.length - 1) : innerWidth;
+    const stepX = chart.labels.length > 1 ? innerWidth / (chart.labels.length - 1) : innerWidth / 2;
 
     const points = values.map((value, index) => {
       const x = PADDING.left + index * stepX;
@@ -32,27 +38,65 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
       return { x, y, value };
     });
 
-    return { points, maxValue, innerWidth, innerHeight, stepX, values };
+    return { points, maxValue, minValue, innerWidth, innerHeight, stepX, values };
   }, [chart]);
 
   if (!plot) return null;
 
+  const accentColor = chart.datasets[0]?.color ?? palette[0];
   const linePoints = plot.points.map(p => `${p.x},${p.y}`).join(' ');
-  const barWidth = Math.max(12, Math.min(28, plot.stepX * 0.6));
+  const barWidth = Math.max(12, Math.min(32, plot.stepX * 0.55));
+  const baseY = PADDING.top + plot.innerHeight;
+
+  // Area fill polygon points (line chart only)
+  const areaPoints = [
+    `${plot.points[0].x},${baseY}`,
+    ...plot.points.map(p => `${p.x},${p.y}`),
+    `${plot.points[plot.points.length - 1].x},${baseY}`,
+  ].join(' ');
+
+  // Y-axis grid lines & labels
+  const yTicks = [0, 0.5, 1].map(ratio => ({
+    y: PADDING.top + plot.innerHeight - ratio * plot.innerHeight,
+    label: formatValue(plot.minValue + ratio * (plot.maxValue - plot.minValue)),
+  }));
 
   return (
     <View style={styles.wrap}>
       {chart.title ? <Text style={styles.title}>{chart.title}</Text> : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
         <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
-          <Line
-            x1={PADDING.left}
-            y1={PADDING.top + plot.innerHeight}
-            x2={PADDING.left + plot.innerWidth}
-            y2={PADDING.top + plot.innerHeight}
-            stroke={colors.border.default}
-            strokeWidth={1}
-          />
+
+          {/* Horizontal grid lines */}
+          {yTicks.map((tick, i) => (
+            <Line
+              key={`grid-${i}`}
+              x1={PADDING.left}
+              y1={tick.y}
+              x2={PADDING.left + plot.innerWidth}
+              y2={tick.y}
+              stroke={colors.border.subtle}
+              strokeWidth={1}
+              strokeDasharray={i === 0 ? undefined : '3,4'}
+            />
+          ))}
+
+          {/* Y-axis labels */}
+          {yTicks.map((tick, i) => (
+            <SvgText
+              key={`ylabel-${i}`}
+              x={PADDING.left - 5}
+              y={tick.y + 4}
+              fill={colors.text.tertiary}
+              fontSize={9}
+              textAnchor="end"
+            >
+              {tick.label}
+            </SvgText>
+          ))}
+
+          {/* Y-axis baseline */}
           <Line
             x1={PADDING.left}
             y1={PADDING.top}
@@ -62,64 +106,89 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
             strokeWidth={1}
           />
 
-          {chart.chartType === 'bar'
-            ? plot.points.map((point, index) => (
-                <Rect
-                  key={`bar-${index}`}
-                  x={point.x - barWidth / 2}
-                  y={point.y}
-                  width={barWidth}
-                  height={PADDING.top + plot.innerHeight - point.y}
-                  fill={chart.datasets[0]?.color ?? palette[0]}
-                  rx={4}
-                />
-              ))
-            : (
+          {chart.chartType === 'bar' ? (
+            // Bar chart
+            plot.points.map((point, index) => (
+              <Rect
+                key={`bar-${index}`}
+                x={point.x - barWidth / 2}
+                y={point.y}
+                width={barWidth}
+                height={baseY - point.y}
+                fill={accentColor}
+                rx={4}
+                opacity={0.88}
+              />
+            ))
+          ) : (
+            // Line chart: area fill + line + dots
+            <>
+              <Polygon
+                points={areaPoints}
+                fill={accentColor}
+                opacity={0.08}
+              />
               <Polyline
                 points={linePoints}
                 fill="none"
-                stroke={chart.datasets[0]?.color ?? palette[0]}
-                strokeWidth={3}
+                stroke={accentColor}
+                strokeWidth={2.5}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
-            )}
+              {plot.points.map((point, index) => (
+                <Circle
+                  key={`dot-${index}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={3.5}
+                  fill={accentColor}
+                  stroke={colors.surface}
+                  strokeWidth={1.5}
+                />
+              ))}
+            </>
+          )}
 
+          {/* X-axis labels */}
           {plot.points.map((point, index) => {
-            if (index % Math.ceil(chart.labels.length / 4) !== 0 && index !== chart.labels.length - 1) {
-              return null;
-            }
+            const step = Math.ceil(chart.labels.length / 5);
+            const isLast = index === chart.labels.length - 1;
+            if (index % step !== 0 && !isLast) return null;
             return (
               <SvgText
-                key={`label-${index}`}
+                key={`xlabel-${index}`}
                 x={point.x}
                 y={CHART_HEIGHT - 8}
                 fill={colors.text.tertiary}
                 fontSize={10}
                 textAnchor="middle"
               >
-                {chart.labels[index]?.slice(0, 8)}
+                {String(chart.labels[index] ?? '').slice(0, 9)}
               </SvgText>
             );
           })}
         </Svg>
       </ScrollView>
 
-      <View style={styles.legendRow}>
-        {chart.datasets.map((dataset, index) => (
-          <View key={`${dataset.label}-${index}`} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: dataset.color ?? palette[index % palette.length] }]} />
-            <Text style={styles.legendText}>{dataset.label}</Text>
-          </View>
-        ))}
-      </View>
+      {/* Legend */}
+      {chart.datasets.length > 0 && (
+        <View style={styles.legendRow}>
+          {chart.datasets.map((dataset, index) => (
+            <View key={`${dataset.label}-${index}`} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: dataset.color ?? palette[index % palette.length] }]} />
+              <Text style={styles.legendText}>{dataset.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 8,
+    gap: 6,
   },
   title: {
     ...typography.smallMd,
@@ -130,11 +199,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    marginTop: 2,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   legendDot: {
     width: 8,

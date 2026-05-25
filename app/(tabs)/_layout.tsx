@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Platform, StyleSheet } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { BlurView } from 'expo-blur';
 import {
@@ -12,15 +13,20 @@ import {
 } from 'lucide-react-native';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
-import { shadows } from '../../src/theme/shadows';
 import { radius } from '../../src/theme/radius';
 
-const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 84 : 68;
-const TAB_BAR_MARGIN = Platform.OS === 'ios' ? 24 : 16;
+const TAB_BAR_HEIGHT = 62;
+const TAB_BAR_FLOAT_GAP = 12;
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
+
+  // Sit the bar just above the system nav bar (insets.bottom) plus a small gap
+  const tabBarBottom = insets.bottom + TAB_BAR_FLOAT_GAP;
+  // On iOS add extra breathing room above the home indicator
+  const tabBarPaddingBottom = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 10;
 
   if (!hasHydrated) {
     return null;
@@ -37,17 +43,21 @@ export default function TabLayout() {
           headerShown: false,
           tabBarStyle: {
             position: 'absolute',
-            bottom: TAB_BAR_MARGIN,
+            bottom: tabBarBottom,
             left: 16,
             right: 16,
             height: TAB_BAR_HEIGHT,
             backgroundColor: 'transparent',
             borderTopWidth: 0,
-            elevation: 0,
-            paddingTop: 10,
-            paddingBottom: Platform.OS === 'ios' ? 26 : 12,
+            elevation: 28,
+            paddingTop: 8,
+            paddingBottom: tabBarPaddingBottom,
             borderRadius: radius['2xl'],
-            ...shadows.float,
+            // iOS shadow
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.75,
+            shadowRadius: 28,
           },
           tabBarActiveTintColor: colors.tabBar.active,
           tabBarInactiveTintColor: colors.tabBar.inactive,
@@ -59,15 +69,19 @@ export default function TabLayout() {
             gap: 2,
           },
           tabBarBackground: () => (
-            Platform.OS === 'ios' ? (
-              <BlurView
-                intensity={80}
-                tint="dark"
-                style={[StyleSheet.absoluteFill, styles.tabBarBg]}
-              />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, styles.tabBarBg, styles.tabBarBgAndroid]} />
-            )
+            <View style={[StyleSheet.absoluteFill, styles.tabBarBg]}>
+              {Platform.OS === 'ios' ? (
+                <BlurView
+                  intensity={96}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, styles.tabBarBgAndroid]} />
+              )}
+              {/* Accent top border line */}
+              <View style={styles.tabBarTopAccent} />
+            </View>
           ),
         }}
       >
@@ -146,10 +160,19 @@ const styles = StyleSheet.create({
     borderRadius: radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.tabBar.border,
+    borderColor: colors.border.strong,
   },
   tabBarBgAndroid: {
-    backgroundColor: colors.tabBar.background,
+    backgroundColor: 'rgba(18, 18, 20, 0.97)',
+  },
+  tabBarTopAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    right: 24,
+    height: 1,
+    backgroundColor: colors.border.focus,
+    borderRadius: 1,
   },
   iconActive: {
     transform: [{ scale: 1.05 }],
