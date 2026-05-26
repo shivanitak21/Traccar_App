@@ -10,6 +10,8 @@
     "newArchEnabled": true,
     "backgroundColor": "#0d0f14",
     "splash": {
+      "image": "./assets/images/elevactics_logo.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0d0f14"
     },
     "ios": {
@@ -40,6 +42,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      "expo-splash-screen",
       "expo-web-browser",
       [
         "expo-location",
@@ -54,7 +57,12 @@
     },
     "extra": {
       "traccarBaseUrl": "https://elevaticsiot.com",
-      "mapboxPublicToken": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw"
-    }
+      "mapboxPublicToken": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw",
+      "router": {},
+      "eas": {
+        "projectId": "d1b116b9-ff23-4c8b-ba56-d7331ca3f941"
+      }
+    },
+    "owner": "t.shivani"
   }
 }
