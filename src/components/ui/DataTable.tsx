@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 
 export interface DataTableColumn<T> {
@@ -26,6 +26,9 @@ export function DataTable<T>({
   emptyMessage = 'No data',
   onRowPress,
 }: DataTableProps<T>) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+
   if (data.length === 0) {
     return (
       <View style={styles.empty}>
@@ -78,18 +81,18 @@ export function DataTable<T>({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors'], isDark: boolean) => StyleSheet.create({
   table: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.default,
   },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundSecondary,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   headerCell: {
     paddingHorizontal: 10,
@@ -106,11 +109,11 @@ const styles = StyleSheet.create({
   dataRow: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
     backgroundColor: colors.surface,
   },
   dataRowAlt: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
   },
   dataCell: {
     paddingHorizontal: 10,
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.default,
     backgroundColor: colors.surface,
   },
   emptyText: {

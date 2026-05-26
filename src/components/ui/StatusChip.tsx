@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { radius } from '../../theme/radius';
 
@@ -14,49 +14,6 @@ interface StatusChipProps {
   style?: ViewStyle;
 }
 
-const variantConfig: Record<ChipVariant, { bg: string; text: string; dot: string }> = {
-  online: {
-    bg: colors.successMuted,
-    text: colors.success,
-    dot: colors.success,
-  },
-  offline: {
-    bg: 'rgba(142,142,147,0.14)',
-    text: colors.status.offline,
-    dot: colors.status.offline,
-  },
-  moving: {
-    bg: colors.blueMuted,
-    text: colors.blue,
-    dot: colors.blue,
-  },
-  idle: {
-    bg: colors.warningMuted,
-    text: colors.warning,
-    dot: colors.warning,
-  },
-  warning: {
-    bg: colors.warningMuted,
-    text: colors.warning,
-    dot: colors.warning,
-  },
-  error: {
-    bg: colors.errorMuted,
-    text: colors.error,
-    dot: colors.error,
-  },
-  info: {
-    bg: colors.infoMuted,
-    text: colors.info,
-    dot: colors.info,
-  },
-  neutral: {
-    bg: colors.accentMuted,
-    text: colors.text.secondary,
-    dot: colors.text.tertiary,
-  },
-};
-
 export const StatusChip: React.FC<StatusChipProps> = ({
   label,
   variant = 'neutral',
@@ -64,8 +21,21 @@ export const StatusChip: React.FC<StatusChipProps> = ({
   dot = true,
   style,
 }) => {
-  const config = variantConfig[variant];
+  const { colors } = useTheme();
   const isSmall = size === 'sm';
+
+  const variantConfig = useMemo(() => ({
+    online:  { bg: colors.successMuted, text: colors.success,       dot: colors.success },
+    offline: { bg: 'rgba(142,142,147,0.14)', text: colors.status.offline, dot: colors.status.offline },
+    moving:  { bg: colors.blueMuted,    text: colors.blue,          dot: colors.blue },
+    idle:    { bg: colors.warningMuted, text: colors.warning,       dot: colors.warning },
+    warning: { bg: colors.warningMuted, text: colors.warning,       dot: colors.warning },
+    error:   { bg: colors.errorMuted,   text: colors.error,         dot: colors.error },
+    info:    { bg: colors.infoMuted,    text: colors.info,          dot: colors.info },
+    neutral: { bg: colors.accentMuted,  text: colors.text.secondary, dot: colors.text.tertiary },
+  }), [colors]);
+
+  const config = variantConfig[variant];
 
   return (
     <View

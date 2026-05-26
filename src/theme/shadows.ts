@@ -1,5 +1,5 @@
 import { ViewStyle } from 'react-native';
-import { colors } from './colors';
+import { darkColors as colors } from './themes';
 
 const shadow = (
   color: string,

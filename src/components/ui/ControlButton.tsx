@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
@@ -21,41 +21,47 @@ export const ControlButton: React.FC<ControlButtonProps> = ({
   label,
   onPress,
   active = false,
-  accent = colors.text.primary,
+  accent,
   size = 'md',
   style,
-}) => (
-  <Pressable
-    onPress={() => {
-      if (onPress) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }
-    }}
-    style={({ pressed }) => [
-      styles.wrapper,
-      size === 'sm' && styles.wrapperSm,
-      style,
-      pressed && styles.pressed,
-    ]}
-  >
-    <View
-      style={[
-        styles.circle,
-        size === 'sm' && styles.circleSm,
-        active && { backgroundColor: `${accent}20`, borderColor: `${accent}40` },
+}) => {
+  const { colors } = useTheme();
+  const resolvedAccent = accent ?? colors.text.primary;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  return (
+    <Pressable
+      onPress={() => {
+        if (onPress) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }
+      }}
+      style={({ pressed }) => [
+        styles.wrapper,
+        size === 'sm' && styles.wrapperSm,
+        style,
+        pressed && styles.pressed,
       ]}
     >
-      {icon}
-    </View>
-    <Text
-      style={[styles.label, size === 'sm' && styles.labelSm, active && { color: accent }]}
-      numberOfLines={1}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);
+      <View
+        style={[
+          styles.circle,
+          size === 'sm' && styles.circleSm,
+          active && { backgroundColor: `${resolvedAccent}20`, borderColor: `${resolvedAccent}40` },
+        ]}
+      >
+        {icon}
+      </View>
+      <Text
+        style={[styles.label, size === 'sm' && styles.labelSm, active && { color: resolvedAccent }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
 
 interface ControlButtonRowProps {
   children: React.ReactNode;
@@ -66,16 +72,19 @@ export const ControlButtonRow: React.FC<ControlButtonRowProps> = ({
   children,
   style,
 }) => (
-  <View style={[styles.row, style]}>{children}</View>
+  <View style={[staticStyles.row, style]}>{children}</View>
 );
 
-const styles = StyleSheet.create({
+const staticStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 6,
   },
+});
+
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     gap: 8,

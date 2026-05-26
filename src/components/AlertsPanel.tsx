@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
   Activity,
   X,
 } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
@@ -27,28 +27,6 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { traccarAPI, TraccarEvent } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
-
-const EVENT_META: Record<string, { label: string; icon: any; color: string }> = {
-  deviceOnline: { label: 'Online', icon: Power, color: colors.success },
-  deviceOffline: { label: 'Offline', icon: Power, color: colors.error },
-  deviceMoving: { label: 'Moving', icon: Navigation, color: colors.blue },
-  deviceStopped: { label: 'Stopped', icon: Navigation, color: colors.text.tertiary },
-  deviceOverspeed: { label: 'Overspeed', icon: Zap, color: colors.warning },
-  geofenceEnter: { label: 'Geofence Enter', icon: Shield, color: colors.primary },
-  geofenceExit: { label: 'Geofence Exit', icon: Shield, color: colors.accent },
-  alarm: { label: 'Alarm', icon: AlertTriangle, color: colors.error },
-  ignitionOn: { label: 'Ignition On', icon: Zap, color: colors.success },
-  ignitionOff: { label: 'Ignition Off', icon: Zap, color: colors.text.tertiary },
-  maintenance: { label: 'Maintenance', icon: Activity, color: colors.accent },
-};
-
-function getEventMeta(type: string) {
-  return EVENT_META[type] ?? {
-    label: type,
-    icon: Bell,
-    color: colors.text.tertiary,
-  };
-}
 
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -89,10 +67,30 @@ interface AlertsPanelProps {
 
 export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) => {
   const { recentEvents, devices, addEvents } = useFleetStore();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [events, setEvents] = useState<TraccarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+
+  const eventMeta = useMemo(() => ({
+    deviceOnline:  { label: 'Online',         icon: Power,         color: colors.success },
+    deviceOffline: { label: 'Offline',        icon: Power,         color: colors.error },
+    deviceMoving:  { label: 'Moving',         icon: Navigation,    color: colors.blue },
+    deviceStopped: { label: 'Stopped',        icon: Navigation,    color: colors.text.tertiary },
+    deviceOverspeed: { label: 'Overspeed',    icon: Zap,           color: colors.warning },
+    geofenceEnter: { label: 'Geofence Enter', icon: Shield,        color: colors.primary },
+    geofenceExit:  { label: 'Geofence Exit',  icon: Shield,        color: colors.accent },
+    alarm:         { label: 'Alarm',          icon: AlertTriangle, color: colors.error },
+    ignitionOn:    { label: 'Ignition On',    icon: Zap,           color: colors.success },
+    ignitionOff:   { label: 'Ignition Off',   icon: Zap,           color: colors.text.tertiary },
+    maintenance:   { label: 'Maintenance',    icon: Activity,      color: colors.accent },
+  }), [colors]);
+
+  const getEventMeta = useCallback((type: string) => {
+    return (eventMeta as any)[type] ?? { label: type, icon: Bell, color: colors.text.tertiary };
+  }, [eventMeta, colors]);
 
   const loadEvents = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -177,7 +175,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
             data={loading ? [] : displayEvents}
             renderItem={({ item, index }) => (
               <Animated.View entering={FadeInDown.delay(index * 20).duration(250)}>
-                <EventRow event={item} deviceName={getDeviceName(item.deviceId)} />
+                <EventRow event={item} deviceName={getDeviceName(item.deviceId)} getEventMeta={getEventMeta} colors={colors} />
               </Animated.View>
             )}
             keyExtractor={(item) => String(item.id)}
@@ -212,10 +210,13 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
   );
 };
 
-const EventRow: React.FC<{ event: TraccarEvent; deviceName: string }> = ({
-  event,
-  deviceName,
-}) => {
+const EventRow: React.FC<{
+  event: TraccarEvent;
+  deviceName: string;
+  getEventMeta: (type: string) => { label: string; icon: any; color: string };
+  colors: ReturnType<typeof useTheme>['colors'];
+}> = ({ event, deviceName, getEventMeta, colors }) => {
+  const erStyles = useMemo(() => makeErStyles(colors), [colors]);
   const meta = getEventMeta(event.type);
   const IconComponent = meta.icon;
 
@@ -236,7 +237,7 @@ const EventRow: React.FC<{ event: TraccarEvent; deviceName: string }> = ({
   );
 };
 
-const erStyles = StyleSheet.create({
+const makeErStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -271,7 +272,7 @@ const erStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',

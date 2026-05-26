@@ -1,19 +1,13 @@
 import React from 'react';
+import { SafeAreaView } from 'react-native';
 import { DevicesScreen } from '../../src/screens/DevicesScreen';
-import { SafeAreaView, StyleSheet } from 'react-native';
-import { colors } from '../../src/theme/colors';
+import { useTheme } from '../../src/theme/ThemeContext';
 
 export default function DevicesTab() {
+  const { colors } = useTheme();
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <DevicesScreen />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-});

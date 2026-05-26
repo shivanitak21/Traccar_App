@@ -27,7 +27,7 @@ import {
   Car,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
@@ -47,12 +47,15 @@ import { useCompanionStore } from '../stores/companionStore';
 import { useAuthStore } from '../stores/authStore';
 import { formatSpeed, type SpeedUnit } from '../utils/units';
 import { getLocationLabel } from '../utils/address';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 const DEFAULT_MAP_CENTER = { latitude: 20.5937, longitude: 78.9629 };
 const MAP_HEIGHT = Math.min(Math.max(Dimensions.get('window').height * 0.54, 360), 520);
 
 export const DashboardScreen: React.FC = () => {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
     devices,
     wsConnected,
@@ -106,7 +109,6 @@ export const DashboardScreen: React.FC = () => {
         traccarAPI.getDevices(),
         traccarAPI.getPositions(),
       ]);
-
       updatePositions(positionsData);
       setDevices(devicesData);
     } catch (err) {
@@ -160,7 +162,6 @@ export const DashboardScreen: React.FC = () => {
           latitude: d.position?.latitude,
           longitude: d.position?.longitude,
         });
-
         return {
           id: `vehicle-${d.id}`,
           latitude: d.position!.latitude,
@@ -172,14 +173,11 @@ export const DashboardScreen: React.FC = () => {
           course: d.position!.course || 0,
         };
       });
-  }, [devices]);
+  }, [devices, colors]);
 
   const mapCenter = useMemo(() => {
     if (selectedDevice?.position) {
-      return {
-        latitude: selectedDevice.position.latitude,
-        longitude: selectedDevice.position.longitude,
-      };
+      return { latitude: selectedDevice.position.latitude, longitude: selectedDevice.position.longitude };
     }
     if (mapMarkers.length === 1) {
       return { latitude: mapMarkers[0].latitude, longitude: mapMarkers[0].longitude };
@@ -187,24 +185,14 @@ export const DashboardScreen: React.FC = () => {
     if (mapMarkers.length > 1) {
       const latSum = mapMarkers.reduce((sum, m) => sum + m.latitude, 0);
       const lonSum = mapMarkers.reduce((sum, m) => sum + m.longitude, 0);
-      return {
-        latitude: latSum / mapMarkers.length,
-        longitude: lonSum / mapMarkers.length,
-      };
+      return { latitude: latSum / mapMarkers.length, longitude: lonSum / mapMarkers.length };
     }
     return DEFAULT_MAP_CENTER;
   }, [selectedDevice, mapMarkers]);
 
-  const mapZoom = selectedDevice
-    ? 14
-    : mapMarkers.length === 1
-      ? 13
-      : mapMarkers.length > 1
-        ? 11
-        : 5;
-
+  const mapZoom = selectedDevice ? 14 : mapMarkers.length === 1 ? 13 : mapMarkers.length > 1 ? 11 : 5;
   const shouldFitAllMarkers = !selectedDeviceId && mapMarkers.length > 0;
-  const dashboardMapLayer: MapLayerType = prefs.darkMap ? 'normal' : 'streets';
+  const dashboardMapLayer: MapLayerType = getThemeBaseMapLayer(isDark);
 
   const now = new Date();
   const hour = now.getHours();
@@ -259,10 +247,7 @@ export const DashboardScreen: React.FC = () => {
           </Animated.View>
 
           {!loading && (
-            <Animated.View
-              entering={FadeInDown.delay(60).duration(500)}
-              style={styles.section}
-            >
+            <Animated.View entering={FadeInDown.delay(60).duration(500)} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <View>
                   <Text style={styles.sectionTitle}>Live Map</Text>
@@ -274,10 +259,7 @@ export const DashboardScreen: React.FC = () => {
                       : 'Fleet locations will appear here'}
                   </Text>
                 </View>
-                <Pressable
-                  style={styles.sectionAction}
-                  onPress={() => router.push('/(tabs)/map' as any)}
-                >
+                <Pressable style={styles.sectionAction} onPress={() => router.push('/(tabs)/map' as any)}>
                   <Text style={styles.sectionActionText}>Full screen</Text>
                   <ChevronRight size={14} color={colors.primary} strokeWidth={2.5} />
                 </Pressable>
@@ -350,10 +332,7 @@ export const DashboardScreen: React.FC = () => {
             </Animated.View>
           )}
 
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(500)}
-            style={[styles.section, styles.lastSection]}
-          >
+          <Animated.View entering={FadeInDown.delay(100).duration(500)} style={[styles.section, styles.lastSection]}>
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionTitle}>Fleet</Text>
@@ -364,10 +343,7 @@ export const DashboardScreen: React.FC = () => {
                 )}
               </View>
               {!loading && recentDevices.length > 0 && (
-                <Pressable
-                  style={styles.sectionAction}
-                  onPress={() => router.push('/(tabs)/devices' as any)}
-                >
+                <Pressable style={styles.sectionAction} onPress={() => router.push('/(tabs)/devices' as any)}>
                   <Text style={styles.sectionActionText}>See all</Text>
                   <ChevronRight size={14} color={colors.primary} strokeWidth={2.5} />
                 </Pressable>
@@ -393,10 +369,7 @@ export const DashboardScreen: React.FC = () => {
             ) : (
               <GlassCard style={styles.vehicleListCard} padding={0} blur>
                 {recentDevices.map((device, idx) => (
-                  <Animated.View
-                    key={device.id}
-                    entering={FadeInDown.delay(idx * 50).duration(400)}
-                  >
+                  <Animated.View key={device.id} entering={FadeInDown.delay(idx * 50).duration(400)}>
                     <DashboardVehicleRow
                       device={device}
                       speedUnit={prefs.speedUnit}
@@ -422,6 +395,9 @@ const DashboardVehicleRow: React.FC<{
   onPress: () => void;
   isLast?: boolean;
 }> = ({ device, speedUnit, onPress, isLast }) => {
+  const { colors } = useTheme();
+  const dvStyles = useMemo(() => makeDvStyles(colors), [colors]);
+
   const statusVariant = device.isMoving ? 'moving'
     : device.computedStatus === 'online' ? 'idle'
     : 'offline';
@@ -483,7 +459,7 @@ const DashboardVehicleRow: React.FC<{
   );
 };
 
-const dvStyles = StyleSheet.create({
+const makeDvStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -496,7 +472,8 @@ const dvStyles = StyleSheet.create({
     borderBottomColor: colors.border.subtle,
   },
   pressed: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: colors.surfaceHover,
+    opacity: 0.9,
   },
   statusDot: {
     width: 8,
@@ -537,7 +514,7 @@ const dvStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   safeArea: {
     flex: 1,
   },
@@ -545,7 +522,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: 120,
   },
-
   wsIconWrap: {
     width: 28,
     height: 28,
@@ -558,7 +534,6 @@ const styles = StyleSheet.create({
     inset: -4,
     borderRadius: 18,
   },
-
   section: {
     marginBottom: 32,
   },
@@ -593,7 +568,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
-
   mapWrap: {
     height: MAP_HEIGHT,
     borderRadius: radius.xl,
@@ -664,7 +638,6 @@ const styles = StyleSheet.create({
   mapActionBtnTextPrimary: {
     color: colors.text.primary,
   },
-
   vehicleList: {
     gap: 10,
   },
@@ -672,7 +645,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.md,
   },
-
   emptyCard: {
     padding: 48,
     alignItems: 'center',

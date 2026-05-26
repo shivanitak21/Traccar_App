@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -9,7 +9,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface SkeletonProps {
   width?: number | string;
@@ -24,6 +24,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   borderRadius = 8,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -42,23 +43,21 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     ],
   }));
 
+  const shimmerColors = isDark
+    ? ['transparent', 'rgba(240,244,248,0.05)', 'rgba(240,244,248,0.08)', 'rgba(240,244,248,0.05)', 'transparent'] as const
+    : ['transparent', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0.6)', 'transparent'] as const;
+
   return (
     <View
       style={[
-        styles.container,
+        { backgroundColor: colors.surfaceElevated, overflow: 'hidden' },
         { width: width as any, height, borderRadius },
         style,
       ]}
     >
       <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
         <LinearGradient
-          colors={[
-            'transparent',
-            'rgba(240,244,248,0.05)',
-            'rgba(240,244,248,0.08)',
-            'rgba(240,244,248,0.05)',
-            'transparent',
-          ]}
+          colors={shimmerColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
@@ -68,41 +67,43 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   );
 };
 
-// Preset skeleton layouts
-export const DeviceCardSkeleton: React.FC = () => (
-  <View style={skeletonStyles.card}>
-    <View style={skeletonStyles.row}>
-      <Skeleton width={44} height={44} borderRadius={12} />
-      <View style={skeletonStyles.flex}>
-        <Skeleton height={16} width="60%" borderRadius={6} style={{ marginBottom: 8 }} />
-        <Skeleton height={12} width="40%" borderRadius={4} />
+export const DeviceCardSkeleton: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeSkeletonStyles(colors), [colors]);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.row}>
+        <Skeleton width={44} height={44} borderRadius={12} />
+        <View style={styles.flex}>
+          <Skeleton height={16} width="60%" borderRadius={6} style={{ marginBottom: 8 }} />
+          <Skeleton height={12} width="40%" borderRadius={4} />
+        </View>
+        <Skeleton width={60} height={24} borderRadius={12} />
       </View>
-      <Skeleton width={60} height={24} borderRadius={12} />
+      <View style={styles.statsRow}>
+        <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
+        <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
+        <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
+      </View>
     </View>
-    <View style={skeletonStyles.statsRow}>
-      <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
-      <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
-      <Skeleton height={48} style={{ flex: 1 }} borderRadius={10} />
+  );
+};
+
+export const StatCardSkeleton: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeSkeletonStyles(colors), [colors]);
+
+  return (
+    <View style={styles.statCard}>
+      <Skeleton width={28} height={28} borderRadius={8} style={{ marginBottom: 12 }} />
+      <Skeleton height={28} width="70%" borderRadius={6} style={{ marginBottom: 6 }} />
+      <Skeleton height={12} width="50%" borderRadius={4} />
     </View>
-  </View>
-);
+  );
+};
 
-export const StatCardSkeleton: React.FC = () => (
-  <View style={skeletonStyles.statCard}>
-    <Skeleton width={28} height={28} borderRadius={8} style={{ marginBottom: 12 }} />
-    <Skeleton height={28} width="70%" borderRadius={6} style={{ marginBottom: 6 }} />
-    <Skeleton height={12} width="50%" borderRadius={4} />
-  </View>
-);
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surfaceElevated,
-    overflow: 'hidden',
-  },
-});
-
-const skeletonStyles = StyleSheet.create({
+const makeSkeletonStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 20,

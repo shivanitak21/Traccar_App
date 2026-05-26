@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLES } from '../api/config';
-import { colors } from '../theme/colors';
+import { darkColors } from '../theme/themes';
 import { typography } from '../theme/typography';
 
 interface Marker {
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     minHeight: 300,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: darkColors.backgroundSecondary,
   },
   webview: {
     flex: 1,
@@ -819,11 +819,11 @@ const styles = StyleSheet.create({
   },
   tokenWarning: {
     padding: 8,
-    backgroundColor: colors.warningMuted,
+    backgroundColor: darkColors.warningMuted,
   },
   tokenWarningText: {
     ...typography.small,
-    color: colors.warning,
+    color: darkColors.warning,
     textAlign: 'center',
   },
 });

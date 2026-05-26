@@ -1,15 +1,13 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Svg, { Polyline, Polygon, Rect, Line, Circle, Text as SvgText } from 'react-native-svg';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { CompanionChartBlock } from '../../api/aiCompanion';
 
 const CHART_HEIGHT = 190;
 const CHART_WIDTH = 320;
 const PADDING = { top: 20, right: 14, bottom: 34, left: 42 };
-
-const palette = colors.chart;
 
 function formatValue(v: number): string {
   if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`;
@@ -18,6 +16,9 @@ function formatValue(v: number): string {
 }
 
 export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart }) => {
+  const { colors } = useTheme();
+  const palette = colors.chart;
+
   const plot = useMemo(() => {
     const dataset = chart.datasets[0];
     if (!dataset || chart.labels.length === 0) return null;
@@ -41,6 +42,37 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
     return { points, maxValue, minValue, innerWidth, innerHeight, stepX, values };
   }, [chart]);
 
+  const styles = useMemo(() => StyleSheet.create({
+    wrap: {
+      gap: 6,
+    },
+    title: {
+      ...typography.smallMd,
+      color: colors.text.primary,
+      fontWeight: '600',
+    },
+    legendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginTop: 2,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    legendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    legendText: {
+      ...typography.tiny,
+      color: colors.text.secondary,
+    },
+  }), [colors]);
+
   if (!plot) return null;
 
   const accentColor = chart.datasets[0]?.color ?? palette[0];
@@ -48,14 +80,12 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
   const barWidth = Math.max(12, Math.min(32, plot.stepX * 0.55));
   const baseY = PADDING.top + plot.innerHeight;
 
-  // Area fill polygon points (line chart only)
   const areaPoints = [
     `${plot.points[0].x},${baseY}`,
     ...plot.points.map(p => `${p.x},${p.y}`),
     `${plot.points[plot.points.length - 1].x},${baseY}`,
   ].join(' ');
 
-  // Y-axis grid lines & labels
   const yTicks = [0, 0.5, 1].map(ratio => ({
     y: PADDING.top + plot.innerHeight - ratio * plot.innerHeight,
     label: formatValue(plot.minValue + ratio * (plot.maxValue - plot.minValue)),
@@ -68,7 +98,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
         <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
 
-          {/* Horizontal grid lines */}
           {yTicks.map((tick, i) => (
             <Line
               key={`grid-${i}`}
@@ -82,7 +111,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
             />
           ))}
 
-          {/* Y-axis labels */}
           {yTicks.map((tick, i) => (
             <SvgText
               key={`ylabel-${i}`}
@@ -96,7 +124,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
             </SvgText>
           ))}
 
-          {/* Y-axis baseline */}
           <Line
             x1={PADDING.left}
             y1={PADDING.top}
@@ -107,7 +134,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
           />
 
           {chart.chartType === 'bar' ? (
-            // Bar chart
             plot.points.map((point, index) => (
               <Rect
                 key={`bar-${index}`}
@@ -121,7 +147,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
               />
             ))
           ) : (
-            // Line chart: area fill + line + dots
             <>
               <Polygon
                 points={areaPoints}
@@ -150,7 +175,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
             </>
           )}
 
-          {/* X-axis labels */}
           {plot.points.map((point, index) => {
             const step = Math.ceil(chart.labels.length / 5);
             const isLast = index === chart.labels.length - 1;
@@ -171,7 +195,6 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
         </Svg>
       </ScrollView>
 
-      {/* Legend */}
       {chart.datasets.length > 0 && (
         <View style={styles.legendRow}>
           {chart.datasets.map((dataset, index) => (
@@ -185,34 +208,3 @@ export const CompanionChart: React.FC<{ chart: CompanionChartBlock }> = ({ chart
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  wrap: {
-    gap: 6,
-  },
-  title: {
-    ...typography.smallMd,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 2,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    ...typography.tiny,
-    color: colors.text.secondary,
-  },
-});

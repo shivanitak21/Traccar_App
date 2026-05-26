@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Eye, EyeOff, Lock, Mail, Server, ChevronRight } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
@@ -32,6 +32,9 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const { login, isLoading, error, clearError } = useAuthStore();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [serverUrl, setServerUrl] = useState<string>(API_CONFIG.DEFAULT_BASE_URL);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -225,7 +228,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
@@ -235,7 +238,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
     paddingVertical: 56,
   },
-
   logoSection: {
     alignItems: 'center',
     marginBottom: 48,
@@ -255,7 +257,7 @@ const styles = StyleSheet.create({
   logoLetter: {
     fontSize: 32,
     fontWeight: '700',
-    color: colors.text.primary,
+    color: colors.primary,
     letterSpacing: -1,
   },
   wordmark: {
@@ -267,7 +269,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.tertiary,
   },
-
   formCard: {
     backgroundColor: colors.surface,
     borderRadius: radius['2xl'],
@@ -287,7 +288,6 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     marginBottom: 32,
   },
-
   fieldGroup: {
     marginBottom: 18,
   },
@@ -317,7 +317,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     paddingVertical: Platform.OS === 'android' ? 12 : 0,
   },
-
   errorBanner: {
     backgroundColor: colors.errorMuted,
     borderRadius: radius.md,
@@ -330,7 +329,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.error,
   },
-
   submitButton: {
     marginTop: 8,
     borderRadius: radius.lg,
@@ -358,7 +356,6 @@ const styles = StyleSheet.create({
   submitDisabled: {
     opacity: 0.7,
   },
-
   footer: {
     alignItems: 'center',
   },

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Shield, User, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
@@ -23,6 +23,8 @@ import { traccarAPI, TraccarDevice, TraccarPermission, TraccarUser } from '../ap
 
 export const UserAccessScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [users, setUsers] = useState<TraccarUser[]>([]);
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
   const [permissions, setPermissions] = useState<TraccarPermission[]>([]);
@@ -36,24 +38,14 @@ export const UserAccessScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [usersData, devicesData] = await Promise.all([
-        traccarAPI.getUsers(),
-        traccarAPI.getDevices(),
-      ]);
+      const [usersData, devicesData] = await Promise.all([traccarAPI.getUsers(), traccarAPI.getDevices()]);
       const permissionsData = await traccarAPI.getAllUserDevicePermissions(usersData);
-      setUsers(usersData);
-      setDevices(devicesData);
-      setPermissions(permissionsData);
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
+      setUsers(usersData); setDevices(devicesData); setPermissions(permissionsData);
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to load users'); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const deviceIdsByUser = useMemo(() => {
     const map = new Map<number, Set<number>>();
@@ -71,78 +63,39 @@ export const UserAccessScreen: React.FC = () => {
     try {
       const updated = await traccarAPI.updateUser(user.id, { ...user, [key]: value });
       setUsers(prev => prev.map(u => (u.id === user.id ? updated : u)));
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update user');
-    }
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to update user'); }
   };
 
   const toggleDeviceAccess = async (user: TraccarUser, deviceId: number, enabled: boolean) => {
     try {
-      if (enabled) {
-        await traccarAPI.linkPermission(user.id, deviceId);
-        setPermissions(prev => [...prev, { userId: user.id, deviceId }]);
-      } else {
-        await traccarAPI.unlinkPermission(user.id, deviceId);
-        setPermissions(prev =>
-          prev.filter(p => !(p.userId === user.id && p.deviceId === deviceId))
-        );
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update device access');
-      loadData();
-    }
+      if (enabled) { await traccarAPI.linkPermission(user.id, deviceId); setPermissions(prev => [...prev, { userId: user.id, deviceId }]); }
+      else { await traccarAPI.unlinkPermission(user.id, deviceId); setPermissions(prev => prev.filter(p => !(p.userId === user.id && p.deviceId === deviceId))); }
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to update device access'); loadData(); }
   };
 
-  const openCreate = () => {
-    setName('');
-    setEmail('');
-    setPassword('');
-    setModalVisible(true);
-  };
+  const openCreate = () => { setName(''); setEmail(''); setPassword(''); setModalVisible(true); };
 
   const createUser = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Validation', 'Name, email, and password are required');
-      return;
-    }
-
+    if (!name.trim() || !email.trim() || !password.trim()) { Alert.alert('Validation', 'Name, email, and password are required'); return; }
     try {
-      await traccarAPI.createUser({
-        name: name.trim(),
-        email: email.trim(),
-        password: password.trim(),
-        readonly: false,
-        administrator: false,
-        disabled: false,
-      });
-      setModalVisible(false);
-      loadData();
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to create user');
-    }
+      await traccarAPI.createUser({ name: name.trim(), email: email.trim(), password: password.trim(), readonly: false, administrator: false, disabled: false });
+      setModalVisible(false); loadData();
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to create user'); }
   };
 
   const deleteUser = (user: TraccarUser) => {
     Alert.alert('Delete user', `Remove ${user.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await traccarAPI.deleteUser(user.id);
-            loadData();
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to delete user');
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await traccarAPI.deleteUser(user.id); loadData(); }
+        catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete user'); }
+      }},
     ]);
   };
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -161,16 +114,10 @@ export const UserAccessScreen: React.FC = () => {
           {users.map(user => {
             const assignedDeviceIds = deviceIdsByUser.get(user.id) ?? new Set<number>();
             const expanded = expandedUserId === user.id;
-
             return (
               <GlassCard key={user.id} style={styles.card}>
-                <Pressable
-                  onPress={() => setExpandedUserId(expanded ? null : user.id)}
-                  style={styles.userRow}
-                >
-                  <View style={styles.avatar}>
-                    <User size={18} color={colors.primary} />
-                  </View>
+                <Pressable onPress={() => setExpandedUserId(expanded ? null : user.id)} style={styles.userRow}>
+                  <View style={styles.avatar}><User size={18} color={colors.primary} /></View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{user.name}</Text>
                     <Text style={styles.userEmail}>{user.email}</Text>
@@ -181,20 +128,22 @@ export const UserAccessScreen: React.FC = () => {
                       <Text style={styles.adminText}>Admin</Text>
                     </View>
                   )}
-                  {expanded ? (
-                    <ChevronUp size={18} color={colors.text.tertiary} />
-                  ) : (
-                    <ChevronDown size={18} color={colors.text.tertiary} />
-                  )}
+                  {expanded ? <ChevronUp size={18} color={colors.text.tertiary} /> : <ChevronDown size={18} color={colors.text.tertiary} />}
                 </Pressable>
 
                 {expanded && (
                   <View style={styles.expandedSection}>
-                    <FlagRow label="Administrator" value={!!user.administrator} onChange={v => updateFlag(user, 'administrator', v)} />
-                    <FlagRow label="Read only" value={!!user.readonly} onChange={v => updateFlag(user, 'readonly', v)} />
-                    <FlagRow label="Device read only" value={!!user.deviceReadonly} onChange={v => updateFlag(user, 'deviceReadonly', v)} />
-                    <FlagRow label="Disabled" value={!!user.disabled} onChange={v => updateFlag(user, 'disabled', v)} />
-
+                    {(['administrator', 'readonly', 'deviceReadonly', 'disabled'] as const).map(flag => (
+                      <View key={flag} style={styles.flagRow}>
+                        <Text style={styles.flagLabel}>{flag === 'deviceReadonly' ? 'Device read only' : flag.charAt(0).toUpperCase() + flag.slice(1)}</Text>
+                        <Switch
+                          value={!!(user as any)[flag]}
+                          onValueChange={v => updateFlag(user, flag, v)}
+                          trackColor={{ false: colors.border.default, true: colors.primaryMuted }}
+                          thumbColor={(user as any)[flag] ? colors.primary : colors.text.tertiary}
+                        />
+                      </View>
+                    ))}
                     <Text style={styles.devicesTitle}>Vehicle access</Text>
                     {devices.length === 0 ? (
                       <Text style={styles.emptyDevices}>No vehicles available</Text>
@@ -214,7 +163,6 @@ export const UserAccessScreen: React.FC = () => {
                         </View>
                       ))
                     )}
-
                     {!user.administrator && (
                       <Pressable onPress={() => deleteUser(user)} style={styles.deleteBtn}>
                         <Text style={styles.deleteText}>Delete user</Text>
@@ -225,10 +173,7 @@ export const UserAccessScreen: React.FC = () => {
               </GlassCard>
             );
           })}
-
-          {!loading && users.length === 0 && (
-            <Text style={styles.empty}>No users yet. Tap + to add one.</Text>
-          )}
+          {!loading && users.length === 0 && <Text style={styles.empty}>No users yet. Tap + to add one.</Text>}
         </ScrollView>
       </SafeAreaView>
 
@@ -236,30 +181,9 @@ export const UserAccessScreen: React.FC = () => {
         <View style={styles.modalBackdrop}>
           <GlassCard style={styles.modalCard}>
             <Text style={styles.modalTitle}>Add User</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Name"
-              placeholderTextColor={colors.text.tertiary}
-              value={name}
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor={colors.text.tertiary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor={colors.text.tertiary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.text.tertiary} value={name} onChangeText={setName} />
+            <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.text.tertiary} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <TextInput style={styles.input} placeholder="Password" placeholderTextColor={colors.text.tertiary} value={password} onChangeText={setPassword} secureTextEntry />
             <View style={styles.modalActions}>
               <Button title="Cancel" variant="ghost" onPress={() => setModalVisible(false)} />
               <Button title="Create" onPress={createUser} />
@@ -271,22 +195,8 @@ export const UserAccessScreen: React.FC = () => {
   );
 };
 
-const FlagRow: React.FC<{ label: string; value: boolean; onChange: (v: boolean) => void }> = ({
-  label, value, onChange,
-}) => (
-  <View style={styles.flagRow}>
-    <Text style={styles.flagLabel}>{label}</Text>
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      trackColor={{ false: colors.border.default, true: colors.primaryMuted }}
-      thumbColor={value ? colors.primary : colors.text.tertiary}
-    />
-  </View>
-);
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { padding: 8, marginRight: 8 },

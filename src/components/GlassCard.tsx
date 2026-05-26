@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ViewStyle, Pressable, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { shadows } from '../theme/shadows';
 import { radius } from '../theme/radius';
 
@@ -28,10 +28,15 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   padding,
   blur = false,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   if (gradient) {
     return (
       <LinearGradient
-        colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)']}
+        colors={isDark
+          ? ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)']
+          : ['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.01)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.base, style]}
@@ -54,7 +59,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   ];
 
   const inner = blur && Platform.OS === 'ios' ? (
-    <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+    <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
   ) : null;
 
   if (onPress || onLongPress) {
@@ -66,7 +71,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           ...cardStyle,
           pressed && styles.pressed,
         ]}
-        android_ripple={{ color: 'rgba(255,255,255,0.06)' }}
+        android_ripple={{ color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
       >
         {inner}
         {children}
@@ -91,19 +96,27 @@ interface GradientCardProps {
 export const GradientBorderCard: React.FC<GradientCardProps> = ({
   children,
   style,
-  colors: gradientColors = ['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.06)'],
-}) => (
-  <LinearGradient
-    colors={gradientColors}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={[styles.gradientOuter, style]}
-  >
-    <View style={styles.gradientInner}>{children}</View>
-  </LinearGradient>
-);
+  colors: gradientColors,
+}) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const defaultGradient = isDark
+    ? (['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.06)'] as const)
+    : (['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.04)'] as const);
 
-const styles = StyleSheet.create({
+  return (
+    <LinearGradient
+      colors={gradientColors ?? defaultGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.gradientOuter, style]}
+    >
+      <View style={styles.gradientInner}>{children}</View>
+    </LinearGradient>
+  );
+};
+
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   base: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,

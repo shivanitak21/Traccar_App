@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -22,17 +22,20 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   unit,
   icon,
   trend,
-  accent = colors.text.primary,
+  accent,
   style,
   size = 'md',
 }) => {
+  const { colors } = useTheme();
+  const resolvedAccent = accent ?? colors.text.primary;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isLg = size === 'lg';
   const isSm = size === 'sm';
 
   return (
     <View style={[styles.container, isLg && styles.lg, isSm && styles.sm, style]}>
       {icon && (
-        <View style={[styles.iconWrapper, { backgroundColor: `${accent}14` }]}>
+        <View style={[styles.iconWrapper, { backgroundColor: `${resolvedAccent}14` }]}>
           {icon}
         </View>
       )}
@@ -76,6 +79,9 @@ export const FleetStatsStrip: React.FC<FleetStatsProps> = ({
   moving,
   idle,
 }) => {
+  const { colors } = useTheme();
+  const stripStyles = useMemo(() => makeStripStyles(colors), [colors]);
+
   const stats = [
     { label: 'Fleet', value: total, color: colors.text.primary },
     { label: 'Online', value: online, color: colors.success },
@@ -96,7 +102,7 @@ export const FleetStatsStrip: React.FC<FleetStatsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -161,7 +167,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const stripStyles = StyleSheet.create({
+const makeStripStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surface,

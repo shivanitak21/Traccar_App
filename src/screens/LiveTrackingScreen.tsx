@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
@@ -10,6 +10,7 @@ import { Navigation, Zap, MapPin, X } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
 import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,6 +21,8 @@ interface LiveTrackingScreenProps {
 
 export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId, onClose }) => {
   const { prefs } = usePrefsStore();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [position, setPosition] = useState<TraccarPosition | null>(null);
   const [positionHistory, setPositionHistory] = useState<TraccarPosition[]>([]);
@@ -32,36 +35,27 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
     setAddress(resolved);
   };
 
-  const loadData = async () => {
-    try {
-      const [deviceData, positions] = await Promise.all([
-        traccarAPI.getDevice(deviceId),
-        traccarAPI.getPositions(deviceId),
-      ]);
-
-      setDevice(deviceData);
-
-      if (positions.length > 0) {
-        const latestPosition = positions[0];
-        setPosition(latestPosition);
-        setPositionHistory(positions.slice(0, 30));
-        setMapCenter({ latitude: latestPosition.latitude, longitude: latestPosition.longitude });
-        void updateAddress(latestPosition);
-      }
-    } catch (error) {
-      console.error('Failed to load tracking data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [deviceData, positions] = await Promise.all([traccarAPI.getDevice(deviceId), traccarAPI.getPositions(deviceId)]);
+        setDevice(deviceData);
+        if (positions.length > 0) {
+          const latestPosition = positions[0];
+          setPosition(latestPosition);
+          setPositionHistory(positions.slice(0, 30));
+          setMapCenter({ latitude: latestPosition.latitude, longitude: latestPosition.longitude });
+          void updateAddress(latestPosition);
+        }
+      } catch (error) { console.error('Failed to load tracking data:', error); }
+      finally { setLoading(false); }
+    };
+
     loadData();
     traccarWS.connect();
 
     const handlePositionUpdate = (updatedPositions: TraccarPosition[]) => {
       const devicePosition = updatedPositions.find(p => p.deviceId === deviceId);
-
       if (devicePosition) {
         setPosition(devicePosition);
         setPositionHistory(prev => [devicePosition, ...prev.slice(0, 29)]);
@@ -71,10 +65,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
     };
 
     traccarWS.on('positions', handlePositionUpdate);
-
-    return () => {
-      traccarWS.off('positions', handlePositionUpdate);
-    };
+    return () => { traccarWS.off('positions', handlePositionUpdate); };
   }, [deviceId]);
 
   if (loading) {
@@ -95,37 +86,11 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
   }
 
   const speedLabel = formatSpeed(position.speed, prefs.speedUnit);
-  const pathCoordinates = positionHistory
-    .filter(p => p.latitude && p.longitude)
-    .map(p => ({
-      latitude: p.latitude,
-      longitude: p.longitude,
-    }));
+  const pathCoordinates = positionHistory.filter(p => p.latitude && p.longitude).map(p => ({ latitude: p.latitude, longitude: p.longitude }));
+  const locationLabel = getLocationLabel({ address, positionAddress: position.address, latitude: position.latitude, longitude: position.longitude });
 
-  const locationLabel = getLocationLabel({
-    address,
-    positionAddress: position.address,
-    latitude: position.latitude,
-    longitude: position.longitude,
-  });
-
-  const markers = [{
-    id: deviceId.toString(),
-    latitude: position.latitude,
-    longitude: position.longitude,
-    title: device?.name || 'Unknown Device',
-    description: locationLabel,
-    color: colors.primary,
-    status: position.speed > 0 ? 'moving' : 'online',
-    course: position.course || 0,
-  }];
-
-  const polylines = pathCoordinates.length > 1 ? [{
-    coordinates: pathCoordinates,
-    color: '#10b981',
-    width: 5,
-    opacity: 0.9,
-  }] : [];
+  const markers = [{ id: deviceId.toString(), latitude: position.latitude, longitude: position.longitude, title: device?.name || 'Unknown Device', description: locationLabel, color: colors.primary, status: position.speed > 0 ? 'moving' : 'online', course: position.course || 0 }];
+  const polylines = pathCoordinates.length > 1 ? [{ coordinates: pathCoordinates, color: '#10b981', width: 5, opacity: 0.9 }] : [];
 
   return (
     <View style={styles.container}>
@@ -135,15 +100,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
         </TouchableOpacity>
       )}
 
-      <WebMapView
-        markers={markers}
-        polylines={polylines}
-        center={mapCenter || { latitude: position.latitude, longitude: position.longitude }}
-        zoom={15}
-        mapLayer="streets"
-        showUserLocation={true}
-        style={styles.map}
-      />
+      <WebMapView markers={markers} polylines={polylines} center={mapCenter || { latitude: position.latitude, longitude: position.longitude }} zoom={15} mapLayer={getThemeBaseMapLayer(isDark)} showUserLocation={true} style={styles.map} />
 
       <View style={styles.infoContainer}>
         <GlassCard style={styles.infoCard}>
@@ -163,7 +120,6 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
                 <Text style={styles.statLabel}>Speed</Text>
               </View>
             </View>
-
             <View style={styles.stat}>
               <MapPin color={colors.secondary} size={20} />
               <View style={styles.statContent}>
@@ -173,111 +129,29 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
             </View>
           </View>
 
-          <Text style={styles.timestamp}>
-            Last update: {new Date(position.fixTime).toLocaleString()}
-          </Text>
+          <Text style={styles.timestamp}>Last update: {new Date(position.fixTime).toLocaleString()}</Text>
         </GlassCard>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.text.secondary,
-    marginTop: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  map: {
-    width,
-    height,
-  },
-  infoContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
-  infoCard: {
-    padding: 16,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  infoContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  deviceName: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  deviceStatus: {
-    ...typography.small,
-    color: colors.success,
-    marginTop: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 12,
-  },
-  stat: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    ...typography.small,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  statLabel: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    fontSize: 10,
-  },
-  address: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  timestamp: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    fontSize: 11,
-  },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  loadingContainer: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { ...typography.body, color: colors.text.secondary, marginTop: 16 },
+  closeButton: { position: 'absolute', top: 50, right: 20, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.glass.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.glass.border },
+  map: { width, height },
+  infoContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20 },
+  infoCard: { padding: 16 },
+  infoHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  infoContent: { flex: 1, marginLeft: 12 },
+  deviceName: { ...typography.body, color: colors.text.primary, fontWeight: '700', fontSize: 18 },
+  deviceStatus: { ...typography.small, color: colors.success, marginTop: 2 },
+  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
+  stat: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  statContent: { flex: 1 },
+  statValue: { ...typography.small, color: colors.text.primary, fontWeight: '600' },
+  statLabel: { ...typography.small, color: colors.text.tertiary, fontSize: 10 },
+  timestamp: { ...typography.small, color: colors.text.tertiary, fontSize: 11 },
 });

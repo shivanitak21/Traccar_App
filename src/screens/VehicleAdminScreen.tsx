@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, Navigation, Pencil } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
@@ -22,6 +22,8 @@ import { traccarAPI, TraccarDevice } from '../api/traccar';
 
 export const VehicleAdminScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -37,83 +39,46 @@ export const VehicleAdminScreen: React.FC = () => {
       setLoading(true);
       const data = await traccarAPI.getDevices();
       setDevices(data);
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load vehicles');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to load vehicles'); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    loadDevices();
-  }, [loadDevices]);
+  useEffect(() => { loadDevices(); }, [loadDevices]);
 
   const openCreate = () => {
-    setEditing(null);
-    setName('');
-    setUniqueId('');
-    setModel('');
-    setPhone('');
-    setCategory('');
+    setEditing(null); setName(''); setUniqueId(''); setModel(''); setPhone(''); setCategory('');
     setModalVisible(true);
   };
 
   const openEdit = (device: TraccarDevice) => {
-    setEditing(device);
-    setName(device.name);
-    setUniqueId(device.uniqueId);
-    setModel(device.model || '');
-    setPhone(device.phone || '');
-    setCategory(device.category || '');
+    setEditing(device); setName(device.name); setUniqueId(device.uniqueId);
+    setModel(device.model || ''); setPhone(device.phone || ''); setCategory(device.category || '');
     setModalVisible(true);
   };
 
   const saveDevice = async () => {
-    if (!name.trim() || !uniqueId.trim()) {
-      Alert.alert('Validation', 'Name and unique ID are required');
-      return;
-    }
+    if (!name.trim() || !uniqueId.trim()) { Alert.alert('Validation', 'Name and unique ID are required'); return; }
     try {
-      const payload: Partial<TraccarDevice> = {
-        name: name.trim(),
-        uniqueId: uniqueId.trim(),
-        model: model.trim() || undefined,
-        phone: phone.trim() || undefined,
-        category: category.trim() || undefined,
-      };
-      if (editing) {
-        await traccarAPI.updateDevice(editing.id, { ...editing, ...payload });
-      } else {
-        await traccarAPI.createDevice({ ...payload, disabled: false });
-      }
-      setModalVisible(false);
-      loadDevices();
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to save vehicle');
-    }
+      const payload: Partial<TraccarDevice> = { name: name.trim(), uniqueId: uniqueId.trim(), model: model.trim() || undefined, phone: phone.trim() || undefined, category: category.trim() || undefined };
+      if (editing) { await traccarAPI.updateDevice(editing.id, { ...editing, ...payload }); }
+      else { await traccarAPI.createDevice({ ...payload, disabled: false }); }
+      setModalVisible(false); loadDevices();
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to save vehicle'); }
   };
 
   const deleteDevice = (device: TraccarDevice) => {
     Alert.alert('Delete vehicle', `Remove ${device.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await traccarAPI.deleteDevice(device.id);
-            loadDevices();
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to delete vehicle');
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await traccarAPI.deleteDevice(device.id); loadDevices(); }
+        catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete vehicle'); }
+      }},
     ]);
   };
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -148,9 +113,7 @@ export const VehicleAdminScreen: React.FC = () => {
               </View>
             </GlassCard>
           ))}
-          {!loading && devices.length === 0 && (
-            <Text style={styles.empty}>No vehicles yet. Tap + to add one.</Text>
-          )}
+          {!loading && devices.length === 0 && <Text style={styles.empty}>No vehicles yet. Tap + to add one.</Text>}
         </ScrollView>
       </SafeAreaView>
 
@@ -174,8 +137,8 @@ export const VehicleAdminScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { padding: 8, marginRight: 8 },
@@ -193,6 +156,6 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: { margin: 16, padding: 20, borderRadius: 16 },
   modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
+  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
 });

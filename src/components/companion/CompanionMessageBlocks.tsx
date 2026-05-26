@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { CompanionContentBlock } from '../../api/aiCompanion';
 import { CompanionChart } from './CompanionChart';
@@ -18,6 +18,9 @@ export const CompanionMessageBlocks: React.FC<CompanionMessageBlocksProps> = ({
   fallbackText,
   streaming,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const contentBlocks = blocks && blocks.length > 0
     ? blocks
     : fallbackText
@@ -45,11 +48,7 @@ export const CompanionMessageBlocks: React.FC<CompanionMessageBlocksProps> = ({
               </View>
             ) : null;
           }
-          return (
-            <CompanionMarkdown key={`text-${index}`}>
-              {block.content}
-            </CompanionMarkdown>
-          );
+          return <CompanionMarkdown key={`text-${index}`}>{block.content}</CompanionMarkdown>;
         }
 
         if (block.type === 'chart') {
@@ -74,24 +73,9 @@ export const CompanionMessageBlocks: React.FC<CompanionMessageBlocksProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  wrap: {
-    gap: 10,
-  },
-  blockCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 10,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  loadingText: {
-    ...typography.small,
-    color: colors.text.tertiary,
-  },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  wrap: { gap: 10 },
+  blockCard: { backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border.default, padding: 10 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  loadingText: { ...typography.small, color: colors.text.tertiary },
 });

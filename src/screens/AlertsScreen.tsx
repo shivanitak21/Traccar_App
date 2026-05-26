@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,16 +12,14 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import {
   Bell,
   AlertTriangle,
-  MapPin,
   Shield,
   Zap,
   Navigation,
   Power,
   Activity,
-  Clock,
   Filter,
 } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
@@ -32,30 +30,6 @@ import { traccarAPI, TraccarEvent } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
 
-// Traccar event type metadata
-const EVENT_META: Record<string, { label: string; icon: any; color: string; severity: 'error' | 'warning' | 'info' | 'neutral' }> = {
-  deviceOnline: { label: 'Online', icon: Power, color: colors.success, severity: 'info' },
-  deviceOffline: { label: 'Offline', icon: Power, color: colors.error, severity: 'error' },
-  deviceMoving: { label: 'Moving', icon: Navigation, color: colors.blue, severity: 'info' },
-  deviceStopped: { label: 'Stopped', icon: Navigation, color: colors.text.tertiary, severity: 'neutral' },
-  deviceOverspeed: { label: 'Overspeed', icon: Zap, color: colors.warning, severity: 'warning' },
-  geofenceEnter: { label: 'Geofence Enter', icon: Shield, color: colors.primary, severity: 'info' },
-  geofenceExit: { label: 'Geofence Exit', icon: Shield, color: colors.accent, severity: 'warning' },
-  alarm: { label: 'Alarm', icon: AlertTriangle, color: colors.error, severity: 'error' },
-  ignitionOn: { label: 'Ignition On', icon: Zap, color: colors.success, severity: 'info' },
-  ignitionOff: { label: 'Ignition Off', icon: Zap, color: colors.text.tertiary, severity: 'neutral' },
-  maintenance: { label: 'Maintenance', icon: Activity, color: colors.accent, severity: 'warning' },
-};
-
-function getEventMeta(type: string) {
-  return EVENT_META[type] ?? {
-    label: type,
-    icon: Bell,
-    color: colors.text.tertiary,
-    severity: 'neutral' as const,
-  };
-}
-
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -63,8 +37,7 @@ function formatTimeAgo(dateStr: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 type FilterTab = 'all' | 'alerts' | 'geofence' | 'connection';
@@ -78,19 +51,17 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 
 function filterEvents(events: TraccarEvent[], tab: FilterTab): TraccarEvent[] {
   switch (tab) {
-    case 'alerts':
-      return events.filter(e => ['alarm', 'deviceOverspeed', 'maintenance'].includes(e.type));
-    case 'geofence':
-      return events.filter(e => ['geofenceEnter', 'geofenceExit'].includes(e.type));
-    case 'connection':
-      return events.filter(e => ['deviceOnline', 'deviceOffline', 'ignitionOn', 'ignitionOff'].includes(e.type));
-    default:
-      return events;
+    case 'alerts': return events.filter(e => ['alarm', 'deviceOverspeed', 'maintenance'].includes(e.type));
+    case 'geofence': return events.filter(e => ['geofenceEnter', 'geofenceExit'].includes(e.type));
+    case 'connection': return events.filter(e => ['deviceOnline', 'deviceOffline', 'ignitionOn', 'ignitionOff'].includes(e.type));
+    default: return events;
   }
 }
 
 export const AlertsScreen: React.FC = () => {
   const { recentEvents, devices, addEvents } = useFleetStore();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [events, setEvents] = useState<TraccarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,14 +70,12 @@ export const AlertsScreen: React.FC = () => {
   const loadEvents = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      // Load last 24h of events
       const to = new Date().toISOString();
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const data = await traccarAPI.getEvents(undefined, from, to);
       setEvents(data || []);
       if (data?.length) addEvents(data);
     } catch {
-      // fallback to WS events
       setEvents(recentEvents as TraccarEvent[]);
     } finally {
       setLoading(false);
@@ -116,7 +85,6 @@ export const AlertsScreen: React.FC = () => {
 
   useEffect(() => {
     loadEvents();
-
     const handleWsEvents = (wsEvents: TraccarEvent[]) => {
       setEvents(prev => [...wsEvents, ...prev].slice(0, 200));
       addEvents(wsEvents);
@@ -126,11 +94,7 @@ export const AlertsScreen: React.FC = () => {
   }, []);
 
   const displayEvents = filterEvents(events.length > 0 ? events : (recentEvents as TraccarEvent[]), activeFilter);
-
-  const getDeviceName = (deviceId: number) =>
-    devices.find(d => d.id === deviceId)?.name ?? `Device #${deviceId}`;
-
-  // Count by severity for summary chips
+  const getDeviceName = (deviceId: number) => devices.find(d => d.id === deviceId)?.name ?? `Device #${deviceId}`;
   const alertCount = events.filter(e => ['alarm', 'deviceOverspeed'].includes(e.type)).length;
   const warnCount = events.filter(e => ['geofenceExit', 'maintenance'].includes(e.type)).length;
 
@@ -156,26 +120,14 @@ export const AlertsScreen: React.FC = () => {
             }
           />
 
-          {/* Summary row */}
           {!loading && (
             <Animated.View entering={FadeIn.duration(400)} style={styles.summaryRow}>
-              <SummaryChip
-                label={`${events.length} total`}
-                color={colors.text.tertiary}
-              />
+              <SummaryChip label={`${events.length} total`} color={colors.text.tertiary} colors={colors} />
               {alertCount > 0 && (
-                <SummaryChip
-                  label={`${alertCount} critical`}
-                  color={colors.error}
-                  bgColor={colors.errorMuted}
-                />
+                <SummaryChip label={`${alertCount} critical`} color={colors.error} bgColor={colors.errorMuted} colors={colors} />
               )}
               {warnCount > 0 && (
-                <SummaryChip
-                  label={`${warnCount} warnings`}
-                  color={colors.warning}
-                  bgColor={colors.warningMuted}
-                />
+                <SummaryChip label={`${warnCount} warnings`} color={colors.warning} bgColor={colors.warningMuted} colors={colors} />
               )}
             </Animated.View>
           )}
@@ -189,15 +141,11 @@ export const AlertsScreen: React.FC = () => {
           </View>
         </Animated.View>
 
-        {/* Events list */}
         <FlashList
           data={loading ? [] : displayEvents}
           renderItem={({ item, index }) => (
             <Animated.View entering={FadeInDown.delay(index * 30).duration(300)}>
-              <EventRow
-                event={item}
-                deviceName={getDeviceName(item.deviceId)}
-              />
+              <EventRow event={item} deviceName={getDeviceName(item.deviceId)} colors={colors} />
             </Animated.View>
           )}
           keyExtractor={(item) => String(item.id)}
@@ -212,7 +160,7 @@ export const AlertsScreen: React.FC = () => {
           ListEmptyComponent={
             loading ? (
               <View style={styles.skeletonList}>
-                {[1, 2, 3, 4, 5].map(i => <EventSkeleton key={i} />)}
+                {[1, 2, 3, 4, 5].map(i => <EventSkeleton key={i} colors={colors} />)}
               </View>
             ) : (
               <View style={styles.empty}>
@@ -232,41 +180,67 @@ export const AlertsScreen: React.FC = () => {
   );
 };
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+type ThemeColors = ReturnType<typeof useTheme>['colors'];
 
-const EventRow: React.FC<{
-  event: TraccarEvent;
-  deviceName: string;
-}> = ({ event, deviceName }) => {
-  const meta = getEventMeta(event.type);
+const EventRow: React.FC<{ event: TraccarEvent; deviceName: string; colors: ThemeColors }> = ({
+  event, deviceName, colors,
+}) => {
+  const erStyles = useMemo(() => makeErStyles(colors), [colors]);
+  const eventMeta: Record<string, { label: string; icon: any; color: string }> = {
+    deviceOnline: { label: 'Online', icon: Power, color: colors.success },
+    deviceOffline: { label: 'Offline', icon: Power, color: colors.error },
+    deviceMoving: { label: 'Moving', icon: Navigation, color: colors.blue },
+    deviceStopped: { label: 'Stopped', icon: Navigation, color: colors.text.tertiary },
+    deviceOverspeed: { label: 'Overspeed', icon: Zap, color: colors.warning },
+    geofenceEnter: { label: 'Geofence Enter', icon: Shield, color: colors.primary },
+    geofenceExit: { label: 'Geofence Exit', icon: Shield, color: colors.accent },
+    alarm: { label: 'Alarm', icon: AlertTriangle, color: colors.error },
+    ignitionOn: { label: 'Ignition On', icon: Zap, color: colors.success },
+    ignitionOff: { label: 'Ignition Off', icon: Zap, color: colors.text.tertiary },
+    maintenance: { label: 'Maintenance', icon: Activity, color: colors.accent },
+  };
+  const meta = eventMeta[event.type] ?? { label: event.type, icon: Bell, color: colors.text.tertiary };
   const IconComponent = meta.icon;
-  const timeAgo = formatTimeAgo(event.eventTime);
 
   return (
     <View style={erStyles.row}>
       <View style={[erStyles.iconWrap, { backgroundColor: `${meta.color}14` }]}>
         <IconComponent size={18} color={meta.color} strokeWidth={1.8} />
       </View>
-
       <View style={erStyles.content}>
         <View style={erStyles.topRow}>
           <Text style={erStyles.label}>{meta.label}</Text>
-          <Text style={erStyles.time}>{timeAgo}</Text>
+          <Text style={erStyles.time}>{formatTimeAgo(event.eventTime)}</Text>
         </View>
         <Text style={erStyles.device}>{deviceName}</Text>
         {event.attributes?.alarm && (
-          <Text style={erStyles.detail}>
-            Alarm: {event.attributes.alarm}
-          </Text>
+          <Text style={erStyles.detail}>Alarm: {event.attributes.alarm}</Text>
         )}
       </View>
-
       <View style={[erStyles.severityDot, { backgroundColor: meta.color }]} />
     </View>
   );
 };
 
-const erStyles = StyleSheet.create({
+const SummaryChip: React.FC<{ label: string; color: string; bgColor?: string; colors: ThemeColors }> = ({
+  label, color, bgColor, colors,
+}) => (
+  <View style={[{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: bgColor ?? colors.surface }]}>
+    <Text style={[{ ...typography.small, fontWeight: '500', color }]}>{label}</Text>
+  </View>
+);
+
+const EventSkeleton: React.FC<{ colors: ThemeColors }> = ({ colors }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.screenPadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border.subtle, gap: 12, opacity: 0.4 }}>
+    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surfaceElevated }} />
+    <View style={{ flex: 1, gap: 6 }}>
+      <View style={{ height: 14, borderRadius: 6, backgroundColor: colors.surfaceElevated, width: '60%' }} />
+      <View style={{ height: 11, borderRadius: 4, backgroundColor: colors.surfaceElevated, width: '35%' }} />
+    </View>
+  </View>
+);
+
+const makeErStyles = (colors: ThemeColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,76 +258,17 @@ const erStyles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  content: {
-    flex: 1,
-    gap: 2,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  label: {
-    ...typography.bodyMd,
-    color: colors.text.primary,
-  },
-  time: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    fontVariant: ['tabular-nums'],
-  },
-  device: {
-    ...typography.caption,
-    color: colors.text.tertiary,
-  },
-  detail: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    fontStyle: 'italic',
-  },
-  severityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    flexShrink: 0,
-  },
+  content: { flex: 1, gap: 2 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  label: { ...typography.bodyMd, color: colors.text.primary },
+  time: { ...typography.small, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
+  device: { ...typography.caption, color: colors.text.tertiary },
+  detail: { ...typography.small, color: colors.text.tertiary, fontStyle: 'italic' },
+  severityDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
 });
 
-const SummaryChip: React.FC<{ label: string; color: string; bgColor?: string }> = ({
-  label, color, bgColor,
-}) => (
-  <View style={[scStyles.chip, bgColor ? { backgroundColor: bgColor } : {}]}>
-    <Text style={[scStyles.text, { color }]}>{label}</Text>
-  </View>
-);
-
-const scStyles = StyleSheet.create({
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-  },
-  text: {
-    ...typography.small,
-    fontWeight: '500',
-  },
-});
-
-const EventSkeleton: React.FC = () => (
-  <View style={[erStyles.row, { opacity: 0.4 }]}>
-    <View style={[erStyles.iconWrap, { backgroundColor: colors.surfaceElevated }]} />
-    <View style={{ flex: 1, gap: 6 }}>
-      <View style={{ height: 14, borderRadius: 6, backgroundColor: colors.surfaceElevated, width: '60%' }} />
-      <View style={{ height: 11, borderRadius: 4, backgroundColor: colors.surfaceElevated, width: '35%' }} />
-    </View>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+  safeArea: { flex: 1 },
   header: {
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: 8,
@@ -369,10 +284,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.alert,
   },
-  criticalCount: {
-    ...typography.smallMd,
-    color: colors.error,
-  },
+  criticalCount: { ...typography.smallMd, color: colors.error },
   filterBtn: {
     width: 40,
     height: 40,
@@ -383,18 +295,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-    flexWrap: 'wrap',
-  },
-  filterWrap: {
-    marginBottom: 8,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
+  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+  filterWrap: { marginBottom: 8 },
+  listContent: { paddingBottom: 120 },
   skeletonList: {},
   empty: {
     alignItems: 'center',
@@ -403,14 +306,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     gap: 12,
   },
-  emptyTitle: {
-    ...typography.bodyMd,
-    color: colors.text.secondary,
-  },
-  emptySubtitle: {
-    ...typography.caption,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  emptyTitle: { ...typography.bodyMd, color: colors.text.secondary },
+  emptySubtitle: { ...typography.caption, color: colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
 });

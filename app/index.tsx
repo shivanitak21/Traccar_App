@@ -9,11 +9,12 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../src/theme/colors';
+import { useTheme } from '../src/theme/ThemeContext';
 import { useAuthStore } from '../src/stores/authStore';
 
 export default function Index() {
   const { isAuthenticated, isLoading, hasHydrated, initialize } = useAuthStore();
+  const { colors } = useTheme();
   const didInitRef = useRef(false);
 
   const pulse = useSharedValue(0.8);
@@ -40,17 +41,19 @@ export default function Index() {
 
   if (!hasHydrated || isLoading) {
     return (
-      <View style={styles.splash}>
+      <View style={[styles.splash, { backgroundColor: colors.background }]}>
         <LinearGradient
-          colors={['#0a0c12', '#0d0f14']}
+          colors={colors.gradient.dark}
           style={StyleSheet.absoluteFill}
         />
         <Animated.View style={[styles.splashLogo, pulseStyle]}>
           <LinearGradient
-            colors={[colors.primary, colors.primaryLight]}
+            colors={colors.gradient.brand}
             style={styles.splashGradient}
           >
-            <Animated.Text style={styles.splashLetter}>E</Animated.Text>
+            <Animated.Text style={[styles.splashLetter, { color: colors.text.inverse }]}>
+              E
+            </Animated.Text>
           </LinearGradient>
         </Animated.View>
       </View>
@@ -67,7 +70,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -85,6 +87,5 @@ const styles = StyleSheet.create({
   splashLetter: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#0d0f14',
   },
 });

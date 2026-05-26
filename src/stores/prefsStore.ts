@@ -9,7 +9,6 @@ export interface TrackingPrefs {
   fuelUnit: FuelUnit;
   coordinateFormat: 'decimal' | 'dms' | 'ddm';
   timezone: string;
-  darkMap: boolean;
 }
 
 const DEFAULT_PREFS: TrackingPrefs = {
@@ -18,7 +17,6 @@ const DEFAULT_PREFS: TrackingPrefs = {
   fuelUnit: 'liters',
   coordinateFormat: 'decimal',
   timezone: 'UTC',
-  darkMap: false,
 };
 
 function fromServer(server: any): Partial<TrackingPrefs> {

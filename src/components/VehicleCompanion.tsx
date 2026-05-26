@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Bot, X, Send, RotateCcw } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { useCompanionStore } from '../stores/companionStore';
 import { CompanionMessageBlocks } from './companion/CompanionMessageBlocks';
@@ -20,6 +20,8 @@ import { CompanionMessageBlocks } from './companion/CompanionMessageBlocks';
 export const VehicleCompanion: React.FC = () => {
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const {
     visible,
@@ -114,8 +116,8 @@ export const VehicleCompanion: React.FC = () => {
               disabled={sending}
             >
               {sending
-                ? <ActivityIndicator size="small" color="#0d0f14" />
-                : <Send size={18} color="#0d0f14" strokeWidth={2.5} />}
+                ? <ActivityIndicator size="small" color={colors.text.inverse} />
+                : <Send size={18} color={colors.text.inverse} strokeWidth={2.5} />}
             </Pressable>
           </View>
         </View>
@@ -124,7 +126,7 @@ export const VehicleCompanion: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
   },
   userText: {
     ...typography.body,
-    color: '#0d0f14',
+    color: colors.text.inverse,
   },
   inputRow: {
     flexDirection: 'row',

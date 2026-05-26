@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/elevactics_logo.png",
     "scheme": "fleet-tracker",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "backgroundColor": "#0d0f14",
     "splash": {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,12 +11,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarGeofence } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { MapPinned, Plus, Trash2, Edit3, X, Save, Square, RectangleHorizontal } from 'lucide-react-native';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 interface GeofenceScreenProps {
   deviceId: number;
@@ -26,6 +27,8 @@ interface GeofenceScreenProps {
 type DrawingMode = 'none' | 'polygon' | 'rectangle';
 
 export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClose }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [geofences, setGeofences] = useState<TraccarGeofence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,6 +329,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
           onGeofencePress={handleGeofencePress}
           drawingMode={drawingMode}
           onGeofenceDrawn={handleMapDrawing}
+          mapLayer={getThemeBaseMapLayer(isDark)}
           style={styles.map}
         />
         {drawingMode !== 'none' && (
@@ -532,7 +536,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
   },

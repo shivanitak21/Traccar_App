@@ -1,35 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { traccarWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView, MapLayerType } from '../components/WebMapView';
 import { MapPin, X, Layers } from 'lucide-react-native';
-import { usePrefsStore } from '../stores/prefsStore';
 import { useCompanionStore } from '../stores/companionStore';
+import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
 import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
 import { useTabBarBottomInset } from '../utils/tabBarInset';
+import { getThemeBaseMapLayer, resolveMapLayer } from '../utils/mapTheme';
 
 const DEFAULT_MAP_CENTER = { latitude: 20.5937, longitude: 78.9629 };
 
 export const MapScreen: React.FC = () => {
-  const { prefs } = usePrefsStore();
   const openCompanion = useCompanionStore(state => state.open);
+  const { prefs } = usePrefsStore();
   const tabBarBottomInset = useTabBarBottomInset(12);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const themeBaseLayer = getThemeBaseMapLayer(isDark);
+
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
   const [positions, setPositions] = useState<Map<number, TraccarPosition>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
-  const [mapLayer, setMapLayer] = useState<MapLayerType>(prefs.darkMap ? 'normal' : 'streets');
+  const [mapLayer, setMapLayer] = useState<MapLayerType>(themeBaseLayer);
   const [showLayerSelector, setShowLayerSelector] = useState(false);
   const [deviceAddresses, setDeviceAddresses] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
-    setMapLayer(prefs.darkMap ? 'normal' : 'streets');
-  }, [prefs.darkMap]);
+    setMapLayer(prev => resolveMapLayer(prev, isDark));
+  }, [isDark]);
 
   const loadData = async () => {
     try {
@@ -37,22 +42,16 @@ export const MapScreen: React.FC = () => {
         traccarAPI.getDevices(),
         traccarAPI.getPositions(),
       ]);
-
       setDevices(devicesData);
-
       const posMap = new Map<number, TraccarPosition>();
       const addressMap = new Map<number, string>();
-      
-      // Get addresses for all positions
       await Promise.all(
         positionsData.map(async (pos) => {
           posMap.set(pos.deviceId, pos);
-
           const address = pos.address || await resolveAddressForPosition(pos);
           if (address) addressMap.set(pos.deviceId, address);
         })
       );
-      
       setPositions(posMap);
       setDeviceAddresses(addressMap);
     } catch (error) {
@@ -65,37 +64,24 @@ export const MapScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     traccarWS.connect();
-
     const handlePositionUpdate = async (updatedPositions: TraccarPosition[]) => {
       const posMap = new Map(positions);
       const addressMap = new Map(deviceAddresses);
-      
       await Promise.all(
         updatedPositions.map(async (pos) => {
           posMap.set(pos.deviceId, pos);
-          
-          // Update address if not already cached
           if (!addressMap.has(pos.deviceId) || pos.address) {
             const address = await resolveAddressForPosition(pos);
             if (address) addressMap.set(pos.deviceId, address);
           }
         })
       );
-      
       setPositions(posMap);
       setDeviceAddresses(addressMap);
     };
-
     traccarWS.on('positions', handlePositionUpdate);
-
-    return () => {
-      traccarWS.off('positions', handlePositionUpdate);
-    };
+    return () => { traccarWS.off('positions', handlePositionUpdate); };
   }, []);
-
-  const getDeviceName = (deviceId: number) => {
-    return devices.find(d => d.id === deviceId)?.name || 'Unknown';
-  };
 
   const getMapCenter = () => {
     if (selectedDeviceId) {
@@ -104,15 +90,10 @@ export const MapScreen: React.FC = () => {
     }
     if (positions.size === 0) return DEFAULT_MAP_CENTER;
     const coords = Array.from(positions.values());
-    if (coords.length === 1) {
-      return { latitude: coords[0].latitude, longitude: coords[0].longitude };
-    }
+    if (coords.length === 1) return { latitude: coords[0].latitude, longitude: coords[0].longitude };
     const latSum = coords.reduce((sum, pos) => sum + pos.latitude, 0);
     const lonSum = coords.reduce((sum, pos) => sum + pos.longitude, 0);
-    return {
-      latitude: latSum / coords.length,
-      longitude: lonSum / coords.length,
-    };
+    return { latitude: latSum / coords.length, longitude: lonSum / coords.length };
   };
 
   const getMapZoom = () => {
@@ -123,40 +104,20 @@ export const MapScreen: React.FC = () => {
   };
 
   const getMarkers = () => {
-    // Create EXACTLY one marker per device - no duplicates
     const uniqueMarkers: any[] = [];
     const processedDeviceIds = new Set<number>();
-    
-    // Process each position entry ONCE
     positions.forEach((position, deviceId) => {
-      // Skip if we've already processed this device
-      if (processedDeviceIds.has(deviceId)) {
-        console.warn(`Skipping duplicate device ID: ${deviceId}`);
-        return;
-      }
-      
+      if (processedDeviceIds.has(deviceId)) return;
       const device = devices.find(d => d.id === deviceId);
-      if (!device) {
-        console.warn(`Device not found for ID: ${deviceId}`);
-        return;
-      }
-      
-      // Mark as processed
+      if (!device) return;
       processedDeviceIds.add(deviceId);
-      
       const address = deviceAddresses.get(deviceId);
-
       uniqueMarkers.push({
         id: `vehicle-${deviceId}`,
         latitude: position.latitude,
         longitude: position.longitude,
         title: device.name,
-        description: getLocationLabel({
-          address,
-          positionAddress: position.address,
-          latitude: position.latitude,
-          longitude: position.longitude,
-        }),
+        description: getLocationLabel({ address, positionAddress: position.address, latitude: position.latitude, longitude: position.longitude }),
         color: device.status === 'online' ? colors.success : colors.error,
         deviceName: device.name,
         deviceModel: device.model || '',
@@ -164,13 +125,11 @@ export const MapScreen: React.FC = () => {
         course: position.course || 0,
       });
     });
-    
-    console.log(`✓ MapScreen: ${uniqueMarkers.length} unique markers (${devices.length} total devices)`);
     return uniqueMarkers;
   };
 
   const mapLayers: { type: MapLayerType; label: string }[] = [
-    { type: 'normal', label: 'Normal' },
+    { type: themeBaseLayer, label: 'Standard' },
     { type: 'satellite', label: 'Satellite' },
     { type: 'terrain', label: 'Terrain' },
     { type: 'hybrid', label: 'Hybrid' },
@@ -209,14 +168,11 @@ export const MapScreen: React.FC = () => {
             }
           }}
           showUserLocation
-          mapLayer={mapLayer}
+          mapLayer={resolveMapLayer(mapLayer, isDark)}
           style={styles.map}
         />
 
-        <TouchableOpacity
-          style={styles.layerButton}
-          onPress={() => setShowLayerSelector(!showLayerSelector)}
-        >
+        <TouchableOpacity style={styles.layerButton} onPress={() => setShowLayerSelector(!showLayerSelector)}>
           <Layers color={colors.text.primary} size={20} />
         </TouchableOpacity>
 
@@ -227,21 +183,10 @@ export const MapScreen: React.FC = () => {
               {mapLayers.map((layer) => (
                 <TouchableOpacity
                   key={layer.type}
-                  style={[
-                    styles.layerOption,
-                    mapLayer === layer.type && styles.layerOptionActive,
-                  ]}
-                  onPress={() => {
-                    setMapLayer(layer.type);
-                    setShowLayerSelector(false);
-                  }}
+                  style={[styles.layerOption, resolveMapLayer(mapLayer, isDark) === layer.type && styles.layerOptionActive]}
+                  onPress={() => { setMapLayer(layer.type); setShowLayerSelector(false); }}
                 >
-                  <Text
-                    style={[
-                      styles.layerOptionText,
-                      mapLayer === layer.type && styles.layerOptionTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.layerOptionText, resolveMapLayer(mapLayer, isDark) === layer.type && styles.layerOptionTextActive]}>
                     {layer.label}
                   </Text>
                 </TouchableOpacity>
@@ -266,10 +211,7 @@ export const MapScreen: React.FC = () => {
                     {formatSpeed(selectedPosition.speed, prefs.speedUnit)}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setSelectedDeviceId(null)}
-                  style={styles.closeButton}
-                >
+                <TouchableOpacity onPress={() => setSelectedDeviceId(null)} style={styles.closeButton}>
                   <X color={colors.text.secondary} size={20} />
                 </TouchableOpacity>
               </View>
@@ -287,10 +229,7 @@ export const MapScreen: React.FC = () => {
                 <Text style={styles.timestamp}>
                   Last update: {new Date(selectedPosition.fixTime).toLocaleTimeString()}
                 </Text>
-                <TouchableOpacity
-                  style={styles.askAiBtn}
-                  onPress={() => openCompanion(selectedDevice.id, selectedDevice.name)}
-                >
+                <TouchableOpacity style={styles.askAiBtn} onPress={() => openCompanion(selectedDevice.id, selectedDevice.name)}>
                   <Text style={styles.askAiText}>Ask AI Companion</Text>
                 </TouchableOpacity>
               </View>
@@ -302,7 +241,7 @@ export const MapScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -347,18 +286,14 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
   },
-  deviceDetailsCard: {
-    padding: 16,
-  },
+  deviceDetailsCard: { padding: 16 },
   deviceDetailsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  deviceDetailsInfo: {
-    flex: 1,
-  },
+  deviceDetailsInfo: { flex: 1 },
   deviceDetailsName: {
     ...typography.body,
     color: colors.text.primary,
@@ -405,17 +340,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.text.secondary,
-    marginTop: 16,
-  },
   layerButton: {
     position: 'absolute',
     top: 20,
@@ -437,9 +361,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     minWidth: 150,
   },
-  layerCard: {
-    padding: 12,
-  },
+  layerCard: { padding: 12 },
   layerTitle: {
     ...typography.small,
     color: colors.text.secondary,

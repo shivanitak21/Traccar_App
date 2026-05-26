@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 
 interface ScreenHeaderProps {
   title: string;
@@ -18,15 +19,20 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   right,
   large = true,
   style,
-}) => (
-  <View style={[styles.container, style]}>
-    <View style={styles.textBlock}>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-      <Text style={[styles.title, large && styles.titleLarge]}>{title}</Text>
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  return (
+    <View style={[styles.container, style]}>
+      <View style={styles.textBlock}>
+        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        <Text style={[styles.title, large && styles.titleLarge]}>{title}</Text>
+      </View>
+      {right && <View style={styles.right}>{right}</View>}
     </View>
-    {right && <View style={styles.right}>{right}</View>}
-  </View>
-);
+  );
+};
 
 interface HeaderIconButtonProps {
   onPress?: () => void;
@@ -40,25 +46,30 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
   children,
   badge,
   badgeCount,
-}) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
-  >
-    {children}
-    {badgeCount != null && badgeCount > 0 ? (
-      <View style={styles.badgeCount}>
-        <Text style={styles.badgeCountText}>
-          {badgeCount > 99 ? '99+' : badgeCount}
-        </Text>
-      </View>
-    ) : badge ? (
-      <View style={styles.badge} />
-    ) : null}
-  </Pressable>
-);
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
-const styles = StyleSheet.create({
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+    >
+      {children}
+      {badgeCount != null && badgeCount > 0 ? (
+        <View style={styles.badgeCount}>
+          <Text style={styles.badgeCountText}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
+        </View>
+      ) : badge ? (
+        <View style={styles.badge} />
+      ) : null}
+    </Pressable>
+  );
+};
+
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-end',

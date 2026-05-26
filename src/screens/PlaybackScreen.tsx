@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
 import { GlassCard } from '../components/GlassCard';
@@ -21,6 +21,7 @@ import { WebMapView } from '../components/WebMapView';
 import { Play, Pause, SkipBack, SkipForward, X, Calendar, Filter, Clock } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,8 @@ interface PlaybackScreenProps {
 type TimeFilter = '24h' | '7d' | '30d' | 'custom';
 
 export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClose }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [device, setDevice] = useState<TraccarDevice | null>(null);
   const [route, setRoute] = useState<TraccarPosition[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -88,7 +91,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
         course: currentPosition.course || 0,
       },
     ] : [];
-  }, [currentPosition, device, speed]);
+  }, [currentPosition, device, speed, colors]);
 
   const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
@@ -299,7 +302,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
         polylines={polylines}
         center={initialCenter || (route[0] ? { latitude: route[0].latitude, longitude: route[0].longitude } : { latitude: 0, longitude: 0 })}
         zoom={14}
-        mapLayer="streets"
+        mapLayer={getThemeBaseMapLayer(isDark)}
         smoothPlayback
         followMarker={isPlaying}
         style={styles.map}
@@ -553,7 +556,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

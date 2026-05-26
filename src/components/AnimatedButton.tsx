@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, View } from 'react-native';
+import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
@@ -8,8 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import { useTheme } from '../theme/ThemeContext';
 
 interface AnimatedButtonProps {
   title: string;
@@ -26,6 +25,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   disabled = false,
   style,
 }) => {
+  const { colors } = useTheme();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -67,7 +67,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
           {loading ? (
             <ActivityIndicator color={colors.text.inverse} size="small" />
           ) : (
-            <Text style={styles.text}>{title}</Text>
+            <Text style={[styles.text, { color: colors.text.inverse }]}>{title}</Text>
           )}
         </LinearGradient>
       </Pressable>
@@ -90,7 +90,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   text: {
-    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,

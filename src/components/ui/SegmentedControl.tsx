@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { radius } from '../../theme/radius';
 
@@ -24,6 +24,9 @@ export function SegmentedControl<T extends string>({
   onChange,
   scrollable = true,
 }: SegmentedControlProps<T>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const content = options.map(option => {
     const active = option.key === value;
     return (
@@ -58,7 +61,7 @@ export function SegmentedControl<T extends string>({
   return <View style={styles.row}>{content}</View>;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   scrollContent: {
     gap: 8,
     paddingVertical: 2,

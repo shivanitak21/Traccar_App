@@ -11,7 +11,7 @@ import {
   BarChart3,
   Settings,
 } from 'lucide-react-native';
-import { colors } from '../../src/theme/colors';
+import { useTheme } from '../../src/theme/ThemeContext';
 import { typography } from '../../src/theme/typography';
 import { radius } from '../../src/theme/radius';
 
@@ -22,10 +22,9 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
+  const { colors, isDark } = useTheme();
 
-  // Sit the bar just above the system nav bar (insets.bottom) plus a small gap
   const tabBarBottom = insets.bottom + TAB_BAR_FLOAT_GAP;
-  // On iOS add extra breathing room above the home indicator
   const tabBarPaddingBottom = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 10;
 
   if (!hasHydrated) {
@@ -37,7 +36,7 @@ export default function TabLayout() {
   }
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -53,10 +52,9 @@ export default function TabLayout() {
             paddingTop: 8,
             paddingBottom: tabBarPaddingBottom,
             borderRadius: radius['2xl'],
-            // iOS shadow
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.75,
+            shadowOpacity: isDark ? 0.75 : 0.20,
             shadowRadius: 28,
           },
           tabBarActiveTintColor: colors.tabBar.active,
@@ -69,18 +67,17 @@ export default function TabLayout() {
             gap: 2,
           },
           tabBarBackground: () => (
-            <View style={[StyleSheet.absoluteFill, styles.tabBarBg]}>
+            <View style={[StyleSheet.absoluteFill, { borderRadius: radius['2xl'], overflow: 'hidden', borderWidth: 1, borderColor: colors.border.strong }]}>
               {Platform.OS === 'ios' ? (
                 <BlurView
                   intensity={96}
-                  tint="dark"
+                  tint={isDark ? 'dark' : 'light'}
                   style={StyleSheet.absoluteFill}
                 />
               ) : (
-                <View style={[StyleSheet.absoluteFill, styles.tabBarBgAndroid]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(18, 18, 20, 0.97)' : 'rgba(255,255,255,0.97)' }]} />
               )}
-              {/* Accent top border line */}
-              <View style={styles.tabBarTopAccent} />
+              <View style={[styles.tabBarTopAccent, { backgroundColor: colors.border.focus }]} />
             </View>
           ),
         }}
@@ -112,7 +109,7 @@ export default function TabLayout() {
           options={{
             title: 'Map',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? styles.mapIconActive : undefined}>
+              <View style={[focused && { backgroundColor: colors.accentMuted, borderRadius: 12, padding: 5 }]}>
                 <Map size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -154,16 +151,6 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  tabBarBg: {
-    borderRadius: radius['2xl'],
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-  },
-  tabBarBgAndroid: {
-    backgroundColor: 'rgba(18, 18, 20, 0.97)',
   },
   tabBarTopAccent: {
     position: 'absolute',
@@ -171,15 +158,9 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     height: 1,
-    backgroundColor: colors.border.focus,
     borderRadius: 1,
   },
   iconActive: {
     transform: [{ scale: 1.05 }],
-  },
-  mapIconActive: {
-    backgroundColor: colors.accentMuted,
-    borderRadius: 12,
-    padding: 5,
   },
 });

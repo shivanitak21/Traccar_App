@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import Animated, {
-  FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Search,
   Navigation,
@@ -28,7 +23,7 @@ import {
   Info,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
@@ -58,6 +53,8 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
 
 export const DevicesScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const openCompanion = useCompanionStore(state => state.open);
   const {
     devices,
@@ -92,12 +89,10 @@ export const DevicesScreen: React.FC = () => {
 
   useEffect(() => {
     loadDevices();
-
     const handleDevices = (d: TraccarDevice[]) => updateDevices(d);
     const handlePositions = (p: TraccarPosition[]) => updatePositions(p);
     traccarWS.on('devices', handleDevices);
     traccarWS.on('positions', handlePositions);
-
     return () => {
       traccarWS.off('devices', handleDevices);
       traccarWS.off('positions', handlePositions);
@@ -161,7 +156,6 @@ export const DevicesScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* List */}
         {loading ? (
           <View style={styles.skeletonList}>
             {[1, 2, 3, 4].map(i => <DeviceCardSkeleton key={i} />)}
@@ -195,8 +189,6 @@ export const DevicesScreen: React.FC = () => {
   );
 };
 
-// ── Device list item ──────────────────────────────────────────────────────────
-
 const DeviceListItem: React.FC<{
   device: DeviceWithPosition;
   onOpenCompanion: () => void;
@@ -206,6 +198,8 @@ const DeviceListItem: React.FC<{
   onInfo: () => void;
   onCommands: () => void;
 }> = ({ device, onOpenCompanion, onLiveTrack, onPlayback, onGeofence, onInfo, onCommands }) => {
+  const { colors } = useTheme();
+  const diStyles = useMemo(() => makeDiStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const { prefs } = usePrefsStore();
 
@@ -224,15 +218,10 @@ const DeviceListItem: React.FC<{
 
   return (
     <View style={diStyles.card}>
-      {/* Status bar */}
       <View style={[diStyles.statusBar, { backgroundColor: accentColor }]} />
 
-      {/* Main row */}
       <View style={diStyles.mainRow}>
-        <Pressable
-          onPress={onOpenCompanion}
-          style={diStyles.mainPressable}
-        >
+        <Pressable onPress={onOpenCompanion} style={diStyles.mainPressable}>
           <View style={[diStyles.iconWrap, { borderColor: `${accentColor}30` }]}>
             <Navigation size={20} color={accentColor} strokeWidth={1.6} />
           </View>
@@ -256,11 +245,7 @@ const DeviceListItem: React.FC<{
           </View>
 
           <View style={diStyles.rightSection}>
-            <StatusChip
-              label={statusLabel}
-              variant={statusVariant}
-              size="sm"
-            />
+            <StatusChip label={statusLabel} variant={statusVariant} size="sm" />
             {device.ignitionOn !== undefined && (
               <View style={diStyles.ignitionRow}>
                 <Power
@@ -279,11 +264,7 @@ const DeviceListItem: React.FC<{
           </View>
         </Pressable>
 
-        <Pressable
-          onPress={() => setExpanded(v => !v)}
-          hitSlop={8}
-          style={diStyles.expandBtn}
-        >
+        <Pressable onPress={() => setExpanded(v => !v)} hitSlop={8} style={diStyles.expandBtn}>
           <ChevronRight
             size={16}
             color={colors.text.tertiary}
@@ -293,7 +274,6 @@ const DeviceListItem: React.FC<{
         </Pressable>
       </View>
 
-      {/* Expanded actions */}
       {expanded && (
         <View style={diStyles.actions}>
           <ControlButtonRow>
@@ -334,7 +314,7 @@ const DeviceListItem: React.FC<{
   );
 };
 
-const diStyles = StyleSheet.create({
+const makeDiStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -430,16 +410,14 @@ const diStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-
   header: {
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: 8,
   },
-
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -462,11 +440,9 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     fontSize: 14,
   },
-
   filterWrap: {
     marginBottom: 8,
   },
-
   listContent: {
     paddingTop: 8,
     paddingBottom: 120,
@@ -475,8 +451,6 @@ const styles = StyleSheet.create({
     padding: spacing.screenPadding,
     paddingTop: 12,
   },
-
-  // Empty
   empty: {
     alignItems: 'center',
     justifyContent: 'center',

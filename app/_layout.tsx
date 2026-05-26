@@ -9,7 +9,7 @@ import { queryClient } from '../src/api/queryClient';
 import { usePrefsStore } from '../src/stores/prefsStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { VehicleCompanion } from '../src/components/VehicleCompanion';
-import { colors } from '../src/theme/colors';
+import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 
 function AuthRedirector() {
   const router = useRouter();
@@ -36,10 +36,11 @@ function AuthRedirector() {
 function RootNavigator() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
+  const { colors, isDark } = useTheme();
 
   if (!hasHydrated) {
     return (
-      <View style={styles.boot}>
+      <View style={[styles.boot, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -57,7 +58,7 @@ function RootNavigator() {
         <Stack.Screen name="+not-found" />
       </Stack>
       {isAuthenticated ? <VehicleCompanion /> : null}
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </>
   );
 }
@@ -75,9 +76,11 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <QueryClientProvider client={queryClient}>
-        <RootNavigator />
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <RootNavigator />
+        </QueryClientProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }
@@ -90,6 +93,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
   },
 });

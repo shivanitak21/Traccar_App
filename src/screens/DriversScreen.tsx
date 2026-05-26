@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, User, Phone, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
@@ -22,6 +22,8 @@ import { traccarAPI, TraccarDriver } from '../api/traccar';
 
 export const DriversScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [drivers, setDrivers] = useState<TraccarDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,72 +45,42 @@ export const DriversScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadDrivers();
-  }, [loadDrivers]);
+  useEffect(() => { loadDrivers(); }, [loadDrivers]);
 
   const openCreate = () => {
-    setEditing(null);
-    setName('');
-    setUniqueId('');
-    setPhone('');
-    setEmail('');
+    setEditing(null); setName(''); setUniqueId(''); setPhone(''); setEmail('');
     setModalVisible(true);
   };
 
   const openEdit = (driver: TraccarDriver) => {
-    setEditing(driver);
-    setName(driver.name);
-    setUniqueId(driver.uniqueId);
-    setPhone(String(driver.attributes?.phone || ''));
-    setEmail(String(driver.attributes?.email || ''));
+    setEditing(driver); setName(driver.name); setUniqueId(driver.uniqueId);
+    setPhone(String(driver.attributes?.phone || '')); setEmail(String(driver.attributes?.email || ''));
     setModalVisible(true);
   };
 
   const saveDriver = async () => {
-    if (!name.trim() || !uniqueId.trim()) {
-      Alert.alert('Validation', 'Name and unique ID are required');
-      return;
-    }
+    if (!name.trim() || !uniqueId.trim()) { Alert.alert('Validation', 'Name and unique ID are required'); return; }
     try {
-      const payload = {
-        name: name.trim(),
-        uniqueId: uniqueId.trim(),
-        attributes: { phone: phone.trim(), email: email.trim() },
-      };
-      if (editing) {
-        await traccarAPI.updateDriver(editing.id, { ...editing, ...payload });
-      } else {
-        await traccarAPI.createDriver(payload);
-      }
-      setModalVisible(false);
-      loadDrivers();
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to save driver');
-    }
+      const payload = { name: name.trim(), uniqueId: uniqueId.trim(), attributes: { phone: phone.trim(), email: email.trim() } };
+      if (editing) { await traccarAPI.updateDriver(editing.id, { ...editing, ...payload }); }
+      else { await traccarAPI.createDriver(payload); }
+      setModalVisible(false); loadDrivers();
+    } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to save driver'); }
   };
 
   const deleteDriver = (driver: TraccarDriver) => {
     Alert.alert('Delete driver', `Remove ${driver.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await traccarAPI.deleteDriver(driver.id);
-            loadDrivers();
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to delete driver');
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await traccarAPI.deleteDriver(driver.id); loadDrivers(); }
+        catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete driver'); }
+      }},
     ]);
   };
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0a0c12', '#0d0f14']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -183,8 +155,8 @@ export const DriversScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { padding: 8, marginRight: 8 },
@@ -204,6 +176,6 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: { margin: 16, padding: 20, borderRadius: 16 },
   modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
+  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
 });

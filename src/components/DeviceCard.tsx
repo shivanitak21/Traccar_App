@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from './GlassCard';
 import { ControlButton, ControlButtonRow } from './ui/ControlButton';
 import { StatusChip } from './ui/StatusChip';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { radius } from '../theme/radius';
 import { TraccarDevice } from '../api/traccar';
@@ -29,6 +29,8 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   onDeviceInfo,
   onCommands,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isOnline = device.status === 'online';
   const vehicleImageUrl = getVehicleImageUrl(device.model, device.name);
   const [imageError, setImageError] = React.useState(false);
@@ -120,7 +122,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     marginBottom: 20,
     padding: 0,
@@ -179,12 +181,12 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.h3,
-    color: colors.text.primary,
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   uniqueId: {
     ...typography.caption,
-    color: colors.text.secondary,
+    color: 'rgba(255,255,255,0.75)',
   },
   footer: {
     paddingHorizontal: 20,
