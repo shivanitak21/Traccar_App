@@ -16,7 +16,6 @@ import {
   Route,
   Activity,
   ParkingCircle,
-  Calendar,
   Navigation2,
   Navigation,
   Clock,
@@ -24,6 +23,9 @@ import {
   TrendingUp,
   BarChart3,
   Play,
+  Gauge,
+  AlertTriangle,
+  ChevronDown,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
@@ -35,7 +37,10 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { traccarAPI, TraccarTrip, TraccarSummary, TraccarStop, TraccarEvent, TraccarPosition } from '../api/traccar';
 import { useFleetStore } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
-import { DataTable, DataTableColumn } from '../components/ui/DataTable';
+import { WebMapView } from '../components/WebMapView';
+import { MetricCard } from '../components/ui/MetricCard';
+import { StatusChip } from '../components/ui/StatusChip';
+import { ReportChart, MetricBar } from '../components/reports/ReportChart';
 import {
   formatDistance,
   formatDuration,
@@ -48,12 +53,36 @@ import {
 type ReportType = 'route' | 'trips' | 'summary' | 'stops' | 'events';
 
 const REPORT_TYPES: { key: ReportType; label: string; icon: any; desc: string }[] = [
-  { key: 'route', label: 'Route Report', icon: MapPin, desc: 'Position-by-position route table' },
-  { key: 'trips', label: 'Trip Report', icon: Route, desc: 'Start/end points, distance, duration' },
-  { key: 'summary', label: 'Fleet Summary', icon: BarChart3, desc: 'Distance, fuel, engine hours' },
-  { key: 'stops', label: 'Stop Report', icon: ParkingCircle, desc: 'Parking locations and durations' },
-  { key: 'events', label: 'Event Report', icon: Activity, desc: 'All device events and alerts' },
+  { key: 'route', label: 'Route Report', icon: MapPin, desc: 'Map, speed chart & route highlights' },
+  { key: 'trips', label: 'Trip Report', icon: Route, desc: 'Trip cards with distance trends' },
+  { key: 'summary', label: 'Fleet Summary', icon: BarChart3, desc: 'Key metrics at a glance' },
+  { key: 'stops', label: 'Stop Report', icon: ParkingCircle, desc: 'Stop durations & locations' },
+  { key: 'events', label: 'Event Report', icon: Activity, desc: 'Event breakdown & timeline' },
 ];
+
+const LIST_PAGE_SIZE = 8;
+
+function sampleItems<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return items;
+  const step = Math.ceil(items.length / max);
+  return items.filter((_, i) => i % step === 0 || i === items.length - 1);
+}
+
+function formatEventType(type: string): string {
+  return type
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim()
+    .replace(/^\w/, c => c.toUpperCase());
+}
+
+function getEventVariant(type: string): 'error' | 'warning' | 'info' | 'neutral' {
+  const lower = type.toLowerCase();
+  if (lower.includes('alarm') || lower.includes('overspeed') || lower.includes('panic')) return 'error';
+  if (lower.includes('geofence') || lower.includes('ignition')) return 'warning';
+  if (lower.includes('device')) return 'info';
+  return 'neutral';
+}
 
 const DATE_RANGES = [
   { label: 'Today', value: 'today' },
@@ -89,12 +118,6 @@ function getDateRange(range: string): { from: string; to: string } {
   }
 }
 
-function getAttr(position: TraccarPosition, key: string): string {
-  const val = position.attributes?.[key];
-  if (val === undefined || val === null) return '—';
-  return String(val);
-}
-
 export const ReportsScreen: React.FC = () => {
   const { colors } = useTheme();
   const { devices, setDevices } = useFleetStore();
@@ -109,7 +132,6 @@ export const ReportsScreen: React.FC = () => {
   const [events, setEvents] = useState<TraccarEvent[]>([]);
   const [routePositions, setRoutePositions] = useState<TraccarPosition[]>([]);
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 25;
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -195,67 +217,79 @@ export const ReportsScreen: React.FC = () => {
     }
   }, [selectedDeviceId, reportType, dateRange]);
 
-  const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+  const visibleTrips = trips.slice(0, (page + 1) * LIST_PAGE_SIZE);
+  const visibleStops = stops.slice(0, (page + 1) * LIST_PAGE_SIZE);
+  const visibleEvents = events.slice(0, (page + 1) * LIST_PAGE_SIZE);
 
-  const totalPages = Math.max(1, Math.ceil(
-    (reportType === 'route' ? routePositions.length
-      : reportType === 'trips' ? trips.length
-      : reportType === 'stops' ? stops.length
-      : reportType === 'events' ? events.length
-      : summary.length) / PAGE_SIZE
-  ));
+  const tripChartData = useMemo(() => {
+    const slice = trips.slice(0, 12);
+    return {
+      labels: slice.map((_, i) => `#${i + 1}`),
+      values: slice.map(t => t.distance),
+    };
+  }, [trips]);
 
-  const pagedRoute = routePositions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const pagedTrips = trips.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const pagedStops = stops.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const pagedEvents = events.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const stopChartData = useMemo(() => {
+    const slice = stops.slice(0, 10);
+    return {
+      labels: slice.map((_, i) => `S${i + 1}`),
+      values: slice.map(s => normalizeDurationSec(s.duration) / 60),
+    };
+  }, [stops]);
 
-  const routeColumns: DataTableColumn<TraccarPosition>[] = [
-    { key: 'fixTime', label: 'Fix Time', width: 150, render: r => new Date(r.fixTime).toLocaleString() },
-    { key: 'latitude', label: 'Latitude', width: 110, render: r => formatCoordinate(r.latitude, prefs.coordinateFormat) },
-    { key: 'longitude', label: 'Longitude', width: 110, render: r => formatCoordinate(r.longitude, prefs.coordinateFormat) },
-    { key: 'speed', label: 'Speed', width: 90, render: r => formatSpeed(r.speed, prefs.speedUnit) },
-    { key: 'course', label: 'Course', width: 70, render: r => `${Math.round(r.course || 0)}°` },
-    { key: 'address', label: 'Address', width: 180, render: r => r.address || '—' },
-    { key: 'valid', label: 'Valid', width: 60, render: r => (r.valid ? 'Yes' : 'No') },
-    { key: 'ignition', label: 'Ignition', width: 70, render: r => getAttr(r, 'ignition') },
-    { key: 'motion', label: 'Motion', width: 70, render: r => getAttr(r, 'motion') },
-    { key: 'distance', label: 'Distance', width: 100, render: r => formatDistance(Number(getAttr(r, 'distance') === '—' ? 0 : getAttr(r, 'distance')), prefs.distanceUnit) },
-  ];
+  const eventBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    events.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+  }, [events]);
 
-  const tripColumns: DataTableColumn<TraccarTrip>[] = [
-    { key: 'startTime', label: 'Start', width: 150, render: r => new Date(r.startTime).toLocaleString() },
-    { key: 'endTime', label: 'End', width: 150, render: r => new Date(r.endTime).toLocaleString() },
-    { key: 'driverName', label: 'Driver', width: 120, render: r => r.driverName || '—' },
-    { key: 'distance', label: 'Distance', width: 100, render: r => formatDistance(r.distance, prefs.distanceUnit) },
-    { key: 'duration', label: 'Duration', width: 90, render: r => formatDuration(normalizeDurationSec(r.duration)) },
-    { key: 'averageSpeed', label: 'Avg Speed', width: 100, render: r => formatSpeed(r.averageSpeed, prefs.speedUnit) },
-    { key: 'maxSpeed', label: 'Max Speed', width: 100, render: r => formatSpeed(r.maxSpeed, prefs.speedUnit) },
-    { key: 'startAddress', label: 'Start Address', width: 180, render: r => r.startAddress || '—' },
-    { key: 'endAddress', label: 'End Address', width: 180, render: r => r.endAddress || '—' },
-  ];
+  const routeChartData = useMemo(() => {
+    const sampled = sampleItems(routePositions, 20);
+    return {
+      labels: sampled.map(p => new Date(p.fixTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+      values: sampled.map(p => p.speed || 0),
+    };
+  }, [routePositions]);
 
-  const stopColumns: DataTableColumn<TraccarStop>[] = [
-    { key: 'startTime', label: 'Start', width: 150, render: r => new Date(r.startTime).toLocaleString() },
-    { key: 'endTime', label: 'End', width: 150, render: r => new Date(r.endTime).toLocaleString() },
-    { key: 'duration', label: 'Duration', width: 90, render: r => formatDuration(normalizeDurationSec(r.duration)) },
-    { key: 'address', label: 'Address', width: 200, render: r => r.address || '—' },
-  ];
+  const routePolyline = useMemo(() => {
+    if (routePositions.length < 2) return [];
+    return [{
+      id: 'route',
+      coordinates: routePositions.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+      color: colors.primary,
+      width: 4,
+    }];
+  }, [routePositions, colors.primary]);
 
-  const summaryColumns: DataTableColumn<TraccarSummary>[] = [
-    { key: 'deviceName', label: 'Vehicle', width: 140, render: r => r.deviceName },
-    { key: 'distance', label: 'Distance', width: 100, render: r => formatDistance(r.distance, prefs.distanceUnit) },
-    { key: 'averageSpeed', label: 'Avg Speed', width: 100, render: r => formatSpeed(r.averageSpeed, prefs.speedUnit) },
-    { key: 'maxSpeed', label: 'Max Speed', width: 100, render: r => formatSpeed(r.maxSpeed, prefs.speedUnit) },
-    { key: 'engineHours', label: 'Engine Hrs', width: 100, render: r => r.engineHours ? `${r.engineHours.toFixed(1)} h` : '—' },
-    { key: 'spentFuel', label: 'Fuel', width: 90, render: r => r.spentFuel ? formatFuel(r.spentFuel, prefs.fuelUnit) : '—' },
-  ];
+  const routeMarkers = useMemo(() => {
+    if (routePositions.length === 0) return [];
+    const start = routePositions[0];
+    const end = routePositions[routePositions.length - 1];
+    return [
+      {
+        id: 'route-start',
+        latitude: start.latitude,
+        longitude: start.longitude,
+        title: 'Start',
+        color: colors.success,
+      },
+      {
+        id: 'route-end',
+        latitude: end.latitude,
+        longitude: end.longitude,
+        title: 'End',
+        color: colors.error,
+      },
+    ];
+  }, [routePositions, colors.success, colors.error]);
 
-  const eventColumns: DataTableColumn<TraccarEvent>[] = [
-    { key: 'eventTime', label: 'Time', width: 150, render: r => new Date(r.eventTime).toLocaleString() },
-    { key: 'type', label: 'Type', width: 140, render: r => r.type },
-    { key: 'deviceId', label: 'Device ID', width: 90, render: r => String(r.deviceId) },
-  ];
+  const routeMapCenter = useMemo(() => {
+    if (routePositions.length === 0) return undefined;
+    const mid = routePositions[Math.floor(routePositions.length / 2)];
+    return { latitude: mid.latitude, longitude: mid.longitude };
+  }, [routePositions]);
 
   const styles = useMemo(() => StyleSheet.create({
     safeArea: { flex: 1 },
@@ -400,6 +434,43 @@ export const ReportsScreen: React.FC = () => {
       ...typography.caption,
       color: colors.text.tertiary,
       paddingVertical: 8,
+    },
+    metricsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 12,
+    },
+    metricHalf: { width: '47%' },
+    mapContainer: {
+      height: 220,
+      borderRadius: radius.card,
+      overflow: 'hidden',
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    loadMoreBtn: {
+      alignItems: 'center',
+      paddingVertical: 12,
+      marginTop: 4,
+      gap: 4,
+    },
+    loadMoreText: {
+      ...typography.smallMd,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    breakdownCard: {
+      padding: 16,
+      marginBottom: 12,
+      gap: 4,
+    },
+    breakdownTitle: {
+      ...typography.captionMd,
+      color: colors.text.primary,
+      fontWeight: '600',
+      marginBottom: 8,
     },
   }), [colors]);
 
@@ -571,13 +642,30 @@ export const ReportsScreen: React.FC = () => {
                   <EmptyResult message="No route points found for this period" />
                 ) : (
                   <>
-                    <DataTable
-                      columns={routeColumns}
-                      data={pagedRoute}
-                      keyExtractor={(row, i) => `${row.id}-${i}`}
-                      emptyMessage="No route data"
-                    />
-                    <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+                    <RouteOverview positions={routePositions} prefs={prefs} />
+                    {routeMapCenter && routePolyline.length > 0 && (
+                      <View style={styles.mapContainer}>
+                        <WebMapView
+                          markers={routeMarkers}
+                          polylines={routePolyline}
+                          center={routeMapCenter}
+                          zoom={12}
+                          fitToMarkers
+                        />
+                      </View>
+                    )}
+                    {routeChartData.values.length > 1 && (
+                      <ReportChart
+                        title="Speed Profile"
+                        subtitle="Sampled over selected period"
+                        labels={routeChartData.labels}
+                        values={routeChartData.values}
+                        type="line"
+                        color={colors.blue}
+                        valueFormatter={v => formatSpeed(v, prefs.speedUnit)}
+                      />
+                    )}
+                    <RouteHighlights positions={routePositions} prefs={prefs} />
                   </>
                 )
               )}
@@ -588,12 +676,26 @@ export const ReportsScreen: React.FC = () => {
                 ) : (
                   <>
                     <TripsSummaryCard trips={trips} prefs={prefs} />
-                    <DataTable
-                      columns={tripColumns}
-                      data={pagedTrips}
-                      keyExtractor={(row, i) => `${row.startTime}-${i}`}
-                    />
-                    <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+                    {tripChartData.values.length > 0 && (
+                      <ReportChart
+                        title="Trip Distances"
+                        subtitle={`First ${tripChartData.values.length} trips`}
+                        labels={tripChartData.labels}
+                        values={tripChartData.values}
+                        type="bar"
+                        color={colors.primary}
+                        valueFormatter={v => formatDistance(v, prefs.distanceUnit, 0)}
+                      />
+                    )}
+                    {visibleTrips.map((trip, i) => (
+                      <TripRow key={`${trip.startTime}-${i}`} trip={trip} index={i} />
+                    ))}
+                    {visibleTrips.length < trips.length && (
+                      <LoadMoreButton
+                        label={`Show more trips (${trips.length - visibleTrips.length} left)`}
+                        onPress={() => setPage(p => p + 1)}
+                      />
+                    )}
                   </>
                 )
               )}
@@ -602,11 +704,9 @@ export const ReportsScreen: React.FC = () => {
                 summary.length === 0 ? (
                   <EmptyResult message="No data found for this period" />
                 ) : (
-                  <DataTable
-                    columns={summaryColumns}
-                    data={summary}
-                    keyExtractor={(row, i) => `${row.deviceId}-${i}`}
-                  />
+                  summary.map((row, i) => (
+                    <SummaryVisual key={`${row.deviceId}-${i}`} data={row} prefs={prefs} />
+                  ))
                 )
               )}
 
@@ -615,8 +715,27 @@ export const ReportsScreen: React.FC = () => {
                   <EmptyResult message="No stops found for this period" />
                 ) : (
                   <>
-                    <DataTable columns={stopColumns} data={pagedStops} keyExtractor={(row, i) => `${row.startTime}-${i}`} />
-                    <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+                    <StopsOverview stops={stops} />
+                    {stopChartData.values.length > 0 && (
+                      <ReportChart
+                        title="Stop Durations"
+                        subtitle="Minutes per stop"
+                        labels={stopChartData.labels}
+                        values={stopChartData.values}
+                        type="bar"
+                        color={colors.warning}
+                        valueFormatter={v => `${Math.round(v)}m`}
+                      />
+                    )}
+                    {visibleStops.map((stop, i) => (
+                      <StopRow key={`${stop.startTime}-${i}`} stop={stop} />
+                    ))}
+                    {visibleStops.length < stops.length && (
+                      <LoadMoreButton
+                        label={`Show more stops (${stops.length - visibleStops.length} left)`}
+                        onPress={() => setPage(p => p + 1)}
+                      />
+                    )}
                   </>
                 )
               )}
@@ -626,8 +745,31 @@ export const ReportsScreen: React.FC = () => {
                   <EmptyResult message="No events found for this period" />
                 ) : (
                   <>
-                    <DataTable columns={eventColumns} data={pagedEvents} keyExtractor={(row, i) => `${row.id}-${i}`} />
-                    <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+                    <EventsOverview events={events} breakdown={eventBreakdown} />
+                    {eventBreakdown.length > 0 && (
+                      <GlassCard style={styles.breakdownCard}>
+                        <Text style={styles.breakdownTitle}>By Event Type</Text>
+                        {eventBreakdown.map(([type, count], i) => (
+                          <MetricBar
+                            key={type}
+                            label={formatEventType(type)}
+                            value={count}
+                            max={eventBreakdown[0][1]}
+                            display={`${count}`}
+                            color={colors.chart[i % colors.chart.length]}
+                          />
+                        ))}
+                      </GlassCard>
+                    )}
+                    {visibleEvents.map((event, i) => (
+                      <EventRow key={`${event.id}-${i}`} event={event} />
+                    ))}
+                    {visibleEvents.length < events.length && (
+                      <LoadMoreButton
+                        label={`Show more events (${events.length - visibleEvents.length} left)`}
+                        onPress={() => setPage(p => p + 1)}
+                      />
+                    )}
                   </>
                 )
               )}
@@ -711,27 +853,269 @@ const TripsSummaryCard: React.FC<{ trips: TraccarTrip[]; prefs: ReturnType<typeo
   );
 };
 
-const PaginationBar: React.FC<{ page: number; totalPages: number; onChange: (p: number) => void }> = ({
-  page, totalPages, onChange,
-}) => {
+const LoadMoreButton: React.FC<{ label: string; onPress: () => void }> = ({ label, onPress }) => {
   const { colors } = useTheme();
-  const pgStyles = useMemo(() => StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-    btn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.backgroundSecondary },
-    btnText: { ...typography.small, color: colors.primary, fontWeight: '600' },
-    label: { ...typography.small, color: colors.text.secondary },
+  const styles = useMemo(() => StyleSheet.create({
+    btn: { alignItems: 'center', paddingVertical: 12, marginTop: 4, gap: 4 },
+    text: { ...typography.smallMd, color: colors.primary, fontWeight: '600' },
   }), [colors]);
 
   return (
-    <View style={pgStyles.row}>
-      <Pressable disabled={page <= 0} onPress={() => onChange(page - 1)} style={pgStyles.btn}>
-        <Text style={pgStyles.btnText}>Previous</Text>
-      </Pressable>
-      <Text style={pgStyles.label}>Page {page + 1} / {totalPages}</Text>
-      <Pressable disabled={page >= totalPages - 1} onPress={() => onChange(page + 1)} style={pgStyles.btn}>
-        <Text style={pgStyles.btnText}>Next</Text>
-      </Pressable>
+    <Pressable onPress={onPress} style={styles.btn}>
+      <Text style={styles.text}>{label}</Text>
+      <ChevronDown size={16} color={colors.primary} strokeWidth={2} />
+    </Pressable>
+  );
+};
+
+const RouteOverview: React.FC<{
+  positions: TraccarPosition[];
+  prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
+}> = ({ positions, prefs }) => {
+  const { colors } = useTheme();
+  const maxSpeed = Math.max(...positions.map(p => p.speed || 0));
+  const avgSpeed = positions.reduce((s, p) => s + (p.speed || 0), 0) / Math.max(positions.length, 1);
+  const start = positions[0];
+  const end = positions[positions.length - 1];
+  const spanSec = start && end
+    ? (new Date(end.fixTime).getTime() - new Date(start.fixTime).getTime()) / 1000
+    : 0;
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="GPS Points"
+        value={positions.length}
+        icon={<MapPin size={18} color={colors.primary} strokeWidth={1.8} />}
+        accent={colors.primary}
+      />
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Duration"
+        value={formatDuration(spanSec)}
+        icon={<Clock size={18} color={colors.blue} strokeWidth={1.8} />}
+        accent={colors.blue}
+      />
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Avg Speed"
+        value={formatSpeed(avgSpeed, prefs.speedUnit)}
+        icon={<Gauge size={18} color={colors.success} strokeWidth={1.8} />}
+        accent={colors.success}
+      />
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Max Speed"
+        value={formatSpeed(maxSpeed, prefs.speedUnit)}
+        icon={<TrendingUp size={18} color={colors.warning} strokeWidth={1.8} />}
+        accent={colors.warning}
+      />
     </View>
+  );
+};
+
+const RouteHighlights: React.FC<{
+  positions: TraccarPosition[];
+  prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
+}> = ({ positions, prefs }) => {
+  const { colors } = useTheme();
+  const start = positions[0];
+  const end = positions[positions.length - 1];
+  const peak = positions.reduce((best, p) => ((p.speed || 0) > (best.speed || 0) ? p : best), positions[0]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    card: { padding: 14, marginBottom: 8, gap: 10 },
+    title: { ...typography.captionMd, color: colors.text.primary, fontWeight: '600' },
+    row: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+    info: { flex: 1, gap: 2 },
+    label: { ...typography.tiny, color: colors.text.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    time: { ...typography.smallMd, color: colors.text.secondary, fontVariant: ['tabular-nums'] },
+    detail: { ...typography.small, color: colors.text.tertiary },
+  }), [colors]);
+
+  const items = [
+    { label: 'Start', color: colors.success, position: start },
+    { label: 'Peak Speed', color: colors.warning, position: peak, extra: formatSpeed(peak.speed, prefs.speedUnit) },
+    { label: 'End', color: colors.error, position: end },
+  ];
+
+  return (
+    <GlassCard style={styles.card}>
+      <Text style={styles.title}>Route Highlights</Text>
+      {items.map(item => (
+        <View key={item.label} style={styles.row}>
+          <View style={[styles.dot, { backgroundColor: item.color }]} />
+          <View style={styles.info}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text style={styles.time}>{new Date(item.position.fixTime).toLocaleString()}</Text>
+            <Text style={styles.detail} numberOfLines={2}>
+              {item.position.address
+                || `${formatCoordinate(item.position.latitude, prefs.coordinateFormat)}, ${formatCoordinate(item.position.longitude, prefs.coordinateFormat)}`}
+              {item.extra ? ` · ${item.extra}` : ''}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </GlassCard>
+  );
+};
+
+const StopsOverview: React.FC<{ stops: TraccarStop[] }> = ({ stops }) => {
+  const { colors } = useTheme();
+  const totalDuration = stops.reduce((s, stop) => s + normalizeDurationSec(stop.duration), 0);
+  const longest = stops.reduce((best, stop) =>
+    normalizeDurationSec(stop.duration) > normalizeDurationSec(best.duration) ? stop : best, stops[0]);
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Total Stops"
+        value={stops.length}
+        icon={<ParkingCircle size={18} color={colors.warning} strokeWidth={1.8} />}
+        accent={colors.warning}
+      />
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Parked Time"
+        value={formatDuration(totalDuration)}
+        icon={<Clock size={18} color={colors.blue} strokeWidth={1.8} />}
+        accent={colors.blue}
+      />
+      <MetricCard
+        style={{ width: '100%' }}
+        size="sm"
+        label="Longest Stop"
+        value={formatDuration(normalizeDurationSec(longest.duration))}
+        icon={<MapPin size={18} color={colors.primary} strokeWidth={1.8} />}
+        accent={colors.primary}
+      />
+    </View>
+  );
+};
+
+const EventsOverview: React.FC<{
+  events: TraccarEvent[];
+  breakdown: [string, number][];
+}> = ({ events, breakdown }) => {
+  const { colors } = useTheme();
+  const topType = breakdown[0]?.[0];
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Total Events"
+        value={events.length}
+        icon={<Activity size={18} color={colors.blue} strokeWidth={1.8} />}
+        accent={colors.blue}
+      />
+      <MetricCard
+        style={{ width: '47%' }}
+        size="sm"
+        label="Event Types"
+        value={breakdown.length}
+        icon={<BarChart3 size={18} color={colors.primary} strokeWidth={1.8} />}
+        accent={colors.primary}
+      />
+      {topType && (
+        <MetricCard
+          style={{ width: '100%' }}
+          size="sm"
+          label="Most Common"
+          value={formatEventType(topType)}
+          icon={<AlertTriangle size={18} color={colors.warning} strokeWidth={1.8} />}
+          accent={colors.warning}
+        />
+      )}
+    </View>
+  );
+};
+
+const EventRow: React.FC<{ event: TraccarEvent }> = ({ event }) => {
+  const { colors } = useTheme();
+  const variant = getEventVariant(event.type);
+
+  const styles = useMemo(() => StyleSheet.create({
+    card: { padding: 12, marginBottom: 6, gap: 8 },
+    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    time: { ...typography.small, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
+  }), [colors]);
+
+  return (
+    <GlassCard style={styles.card}>
+      <View style={styles.row}>
+        <StatusChip label={formatEventType(event.type)} variant={variant} size="sm" />
+        <Text style={styles.time}>{new Date(event.eventTime).toLocaleString()}</Text>
+      </View>
+    </GlassCard>
+  );
+};
+
+const SummaryVisual: React.FC<{
+  data: TraccarSummary;
+  prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
+}> = ({ data, prefs }) => {
+  const { colors } = useTheme();
+  const metrics = [
+    { label: 'Distance', value: data.distance, display: formatDistance(data.distance, prefs.distanceUnit), color: colors.primary },
+    { label: 'Max Speed', value: data.maxSpeed, display: formatSpeed(data.maxSpeed, prefs.speedUnit), color: colors.warning },
+    { label: 'Avg Speed', value: data.averageSpeed, display: formatSpeed(data.averageSpeed, prefs.speedUnit), color: colors.blue },
+    ...(data.engineHours ? [{ label: 'Engine Hours', value: data.engineHours, display: `${data.engineHours.toFixed(1)} h`, color: colors.success }] : []),
+    ...(data.spentFuel && data.spentFuel > 0 ? [{ label: 'Fuel Used', value: data.spentFuel, display: formatFuel(data.spentFuel, prefs.fuelUnit), color: colors.error }] : []),
+  ];
+  const maxMetric = Math.max(...metrics.map(m => m.value), 1);
+
+  const styles = useMemo(() => StyleSheet.create({
+    card: { padding: 16, marginBottom: 12, gap: 12 },
+    device: { ...typography.h4, color: colors.text.primary },
+    subtitle: { ...typography.small, color: colors.text.tertiary, marginTop: -6 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    metricBox: {
+      width: '47%',
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 12,
+      padding: 12,
+      gap: 4,
+    },
+    metricValue: { ...typography.captionMd, color: colors.text.primary, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    metricLabel: { ...typography.tiny, color: colors.text.tertiary },
+  }), [colors]);
+
+  return (
+    <GlassCard style={styles.card}>
+      <Text style={styles.device}>{data.deviceName}</Text>
+      <Text style={styles.subtitle}>Performance breakdown</Text>
+
+      <View style={styles.grid}>
+        {metrics.slice(0, 4).map(metric => (
+          <View key={metric.label} style={styles.metricBox}>
+            <Text style={styles.metricValue}>{metric.display}</Text>
+            <Text style={styles.metricLabel}>{metric.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {metrics.map(metric => (
+        <MetricBar
+          key={metric.label}
+          label={metric.label}
+          value={metric.value}
+          max={maxMetric}
+          display={metric.display}
+          color={metric.color}
+        />
+      ))}
+    </GlassCard>
   );
 };
 
@@ -843,7 +1227,7 @@ const TripRow: React.FC<{ trip: TraccarTrip; index: number }> = ({ trip, index }
 
       <View style={trStyles.statsRow}>
         <View style={trStyles.stat}>
-          <Text style={trStyles.statVal}>{formatDuration(trip.duration / 1000)}</Text>
+          <Text style={trStyles.statVal}>{formatDuration(normalizeDurationSec(trip.duration))}</Text>
           <Text style={trStyles.statLbl}>Duration</Text>
         </View>
         <View style={trStyles.stat}>
@@ -868,59 +1252,6 @@ const TripRow: React.FC<{ trip: TraccarTrip; index: number }> = ({ trip, index }
           <Text style={trStyles.endAddr} numberOfLines={1}>{trip.endAddress}</Text>
         </View>
       )}
-    </GlassCard>
-  );
-};
-
-const SummaryCard: React.FC<{ data: TraccarSummary }> = ({ data }) => {
-  const { colors } = useTheme();
-  const { prefs } = usePrefsStore();
-
-  const sumStyles = useMemo(() => StyleSheet.create({
-    card: { padding: 16, marginBottom: 8 },
-    device: { ...typography.h4, color: colors.text.primary, marginBottom: 12 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    stat: {
-      backgroundColor: colors.backgroundSecondary,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-      borderRadius: 10,
-      alignItems: 'center',
-      minWidth: 80,
-    },
-    val: { ...typography.captionMd, color: colors.text.primary, fontVariant: ['tabular-nums'] },
-    lbl: { ...typography.tiny, color: colors.text.tertiary },
-  }), [colors]);
-
-  return (
-    <GlassCard style={sumStyles.card}>
-      <Text style={sumStyles.device}>{data.deviceName}</Text>
-      <View style={sumStyles.grid}>
-        <View style={sumStyles.stat}>
-          <Text style={sumStyles.val}>{formatDistance(data.distance, prefs.distanceUnit)}</Text>
-          <Text style={sumStyles.lbl}>Distance</Text>
-        </View>
-        <View style={sumStyles.stat}>
-          <Text style={sumStyles.val}>{formatSpeed(data.maxSpeed, prefs.speedUnit)}</Text>
-          <Text style={sumStyles.lbl}>Max Speed</Text>
-        </View>
-        <View style={sumStyles.stat}>
-          <Text style={sumStyles.val}>{formatSpeed(data.averageSpeed, prefs.speedUnit)}</Text>
-          <Text style={sumStyles.lbl}>Avg Speed</Text>
-        </View>
-        {data.engineHours != null && (
-          <View style={sumStyles.stat}>
-            <Text style={sumStyles.val}>{formatDuration(data.engineHours)}</Text>
-            <Text style={sumStyles.lbl}>Engine Hrs</Text>
-          </View>
-        )}
-        {data.spentFuel != null && data.spentFuel > 0 && (
-          <View style={sumStyles.stat}>
-            <Text style={sumStyles.val}>{formatFuel(data.spentFuel, prefs.fuelUnit)}</Text>
-            <Text style={sumStyles.lbl}>Fuel</Text>
-          </View>
-        )}
-      </View>
     </GlassCard>
   );
 };
@@ -957,10 +1288,10 @@ const StopRow: React.FC<{ stop: TraccarStop }> = ({ stop }) => {
             {stop.address || `${stop.lat?.toFixed(4)}, ${stop.lon?.toFixed(4)}`}
           </Text>
           <Text style={stStyles.time}>
-            {new Date(stop.startTime).toLocaleTimeString()} — {formatDuration(stop.duration / 1000)}
+            {new Date(stop.startTime).toLocaleTimeString()} — {new Date(stop.endTime).toLocaleTimeString()}
           </Text>
         </View>
-        <Text style={stStyles.dur}>{formatDuration(stop.duration / 1000)}</Text>
+        <Text style={stStyles.dur}>{formatDuration(normalizeDurationSec(stop.duration))}</Text>
       </View>
     </GlassCard>
   );
