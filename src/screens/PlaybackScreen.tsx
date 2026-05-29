@@ -242,8 +242,8 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     const kmh = speed * 1.852;
     // Using darker, muted colors for better visibility on map
     if (kmh < 20) return '#1a4d2e'; // Dark green
-    if (kmh < 60) return '#8b5a00'; // Dark orange
-    return '#5C3A18'; // Dark warm amber (high speed)
+    if (kmh < 60) return '#2563A8'; // Medium blue
+    return '#1A4A7A'; // Deep blue (high speed)
   };
 
   const getFilterLabel = (filter: TimeFilter) => {

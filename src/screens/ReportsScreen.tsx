@@ -38,6 +38,7 @@ import { traccarAPI, TraccarTrip, TraccarSummary, TraccarStop, TraccarEvent, Tra
 import { useFleetStore } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { WebMapView } from '../components/WebMapView';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 import { MetricCard } from '../components/ui/MetricCard';
 import { StatusChip } from '../components/ui/StatusChip';
 import { ReportChart, MetricBar } from '../components/reports/ReportChart';
@@ -119,7 +120,7 @@ function getDateRange(range: string): { from: string; to: string } {
 }
 
 export const ReportsScreen: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { devices, setDevices } = useFleetStore();
   const { prefs } = usePrefsStore();
   const [reportType, setReportType] = useState<ReportType>('route');
@@ -381,12 +382,17 @@ export const ReportsScreen: React.FC = () => {
       ...typography.captionMd,
       color: colors.text.tertiary,
     },
+    runSection: {
+      alignItems: 'center',
+    },
     runButton: {
+      alignSelf: 'center',
       borderRadius: 14,
       overflow: 'hidden',
     },
     runGradient: {
-      height: 52,
+      height: 48,
+      paddingHorizontal: 28,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -396,9 +402,9 @@ export const ReportsScreen: React.FC = () => {
       gap: 8,
     },
     runText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '700',
-      color: colors.text.inverse,
+      color: '#FFFFFF',
       letterSpacing: 0.1,
     },
     runButtonPressed: {
@@ -591,7 +597,7 @@ export const ReportsScreen: React.FC = () => {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(220).duration(450)} style={styles.section}>
+          <Animated.View entering={FadeInDown.delay(220).duration(450)} style={[styles.section, styles.runSection]}>
             <Pressable
               onPress={runReport}
               disabled={loading || !selectedDeviceId}
@@ -602,7 +608,7 @@ export const ReportsScreen: React.FC = () => {
               ]}
             >
               <LinearGradient
-                colors={colors.gradient.cta}
+                colors={colors.gradient.brand}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.runGradient}
@@ -611,7 +617,7 @@ export const ReportsScreen: React.FC = () => {
                   <Text style={styles.runText}>Generating...</Text>
                 ) : (
                   <View style={styles.runContent}>
-                    <Play size={16} color={colors.text.inverse} strokeWidth={2.5} />
+                    <Play size={16} color="#FFFFFF" strokeWidth={2.5} />
                     <Text style={styles.runText}>Generate Report</Text>
                   </View>
                 )}
@@ -650,6 +656,7 @@ export const ReportsScreen: React.FC = () => {
                           polylines={routePolyline}
                           center={routeMapCenter}
                           zoom={12}
+                          mapLayer={getThemeBaseMapLayer(isDark)}
                           fitToMarkers
                         />
                       </View>

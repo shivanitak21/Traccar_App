@@ -78,6 +78,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
 }) => {
   const webViewRef = useRef<WebView>(null);
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapDataRef = useRef<Record<string, unknown> | null>(null);
   const onInteractionStartRef = useRef(onInteractionStart);
   const onInteractionEndRef = useRef(onInteractionEnd);
 
@@ -101,40 +102,39 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     fitToMarkers,
   }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode, smoothPlayback, followMarker, fitToMarkers]);
 
-  const updateMap = useCallback(() => {
-    if (webViewRef.current) {
-      // Clear any pending updates
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+  mapDataRef.current = mapData;
+
+  const flushMapUpdate = useCallback(() => {
+    if (!webViewRef.current) return;
+    const script = `
+      if (window.updateMapData) {
+        window.updateMapData(${JSON.stringify(mapDataRef.current)});
       }
-      
-      // Throttle updates to prevent excessive re-renders
-      updateTimeoutRef.current = setTimeout(() => {
-        if (webViewRef.current) {
-          const script = `
-            if (window.updateMapData) {
-              window.updateMapData(${JSON.stringify(mapData)});
-            }
-            true;
-          `;
-          webViewRef.current.injectJavaScript(script);
-        }
-      }, 50);
+      true;
+    `;
+    webViewRef.current.injectJavaScript(script);
+  }, []);
+
+  const scheduleMapUpdate = useCallback(() => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
     }
-  }, [mapData]);
+    updateTimeoutRef.current = setTimeout(() => {
+      updateTimeoutRef.current = null;
+      flushMapUpdate();
+    }, 50);
+  }, [flushMapUpdate]);
 
   useEffect(() => {
-    // Small delay to ensure WebView is ready
-    const timer = setTimeout(() => {
-      updateMap();
-    }, 100);
-    return () => {
-      clearTimeout(timer);
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, [updateMap]);
+    scheduleMapUpdate();
+  }, [mapData, scheduleMapUpdate]);
+
+  useEffect(() => () => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleMessage = useCallback((event: any) => {
     try {
@@ -282,8 +282,17 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       if (el) el.style.transform = 'rotate(' + (course || 0) + 'deg)';
     }
 
+    function syncMapLayer(layerType) {
+      if (layerType && layerType !== currentLayerType) {
+        currentLayerType = layerType;
+        setMapLayer(layerType);
+      }
+    }
+
     function updateSmoothPlayback(data) {
       if (!map) return;
+
+      syncMapLayer(data.mapLayer);
 
       const marker = data.markers && data.markers[0];
       const trailPoly = data.polylines && data.polylines.find(p => p.id === 'trail')
@@ -328,10 +337,16 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       }
 
       if (data.followMarker && marker) {
-        map.panTo([marker.latitude, marker.longitude], {
-          animate: false,
-          noMoveStart: true,
-        });
+        const trackingZoom = data.zoom || 17;
+        if (!playbackInitialized) {
+          map.setView([marker.latitude, marker.longitude], trackingZoom);
+          playbackInitialized = true;
+        } else {
+          map.panTo([marker.latitude, marker.longitude], {
+            animate: false,
+            noMoveStart: true,
+          });
+        }
       } else if (!playbackInitialized && data.center) {
         map.setView([data.center.latitude, data.center.longitude], data.zoom || 14);
         playbackInitialized = true;
@@ -399,7 +414,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       map.on('touchend', () => notifyInteraction(false));
       map.on('touchcancel', () => notifyInteraction(false));
 
-      setMapLayer('normal');
+      setMapLayer('${mapLayer}');
 
       ${showUserLocation ? `
         if (navigator.geolocation) {
@@ -423,7 +438,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         polylines: [],
         center: { latitude: 20.5937, longitude: 78.9629 },
         zoom: 5,
-        mapLayer: 'normal',
+        mapLayer: '${mapLayer}',
         geofences: [],
         selectedGeofenceId: null,
         drawingMode: 'none'
@@ -471,10 +486,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       resetPlaybackLayers();
 
       // Update map layer if changed
-      if (data.mapLayer && data.mapLayer !== currentLayerType) {
-        currentLayerType = data.mapLayer;
-        setMapLayer(data.mapLayer);
-      }
+      syncMapLayer(data.mapLayer);
 
       // Remove all existing markers, polylines, and geofences
       markersLayer.forEach(m => {
@@ -562,7 +574,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           if (!areaData) return;
 
           const isSelected = data.selectedGeofenceId === geofence.id;
-          const color = isSelected ? '#E8A84A' : (geofence.color || '#00f3ff');
+          const color = isSelected ? '#0A84FF' : (geofence.color || '#00f3ff');
           const opacity = isSelected ? 0.4 : 0.2;
           const weight = isSelected ? 3 : 2;
 
@@ -755,7 +767,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         setSupportMultipleWindows={false}
         androidLayerType="hardware"
         nestedScrollEnabled
-        onLoadEnd={updateMap}
+        onLoadEnd={flushMapUpdate}
       />
     </View>
   );
@@ -778,11 +790,21 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     (!prevProps.polylines || !nextProps.polylines ||
      prevProps.polylines.every((p, i) => {
        const next = nextProps.polylines![i];
-       return p.coordinates.length === next.coordinates.length &&
-         p.color === next.color &&
+       if (p.coordinates.length !== next.coordinates.length) return false;
+       if (p.coordinates.length === 0) {
+         return p.color === next.color &&
+           p.width === next.width &&
+           p.opacity === next.opacity &&
+           p.dashed === next.dashed;
+       }
+       const lastPrev = p.coordinates[p.coordinates.length - 1];
+       const lastNext = next.coordinates[next.coordinates.length - 1];
+       return p.color === next.color &&
          p.width === next.width &&
          p.opacity === next.opacity &&
-         p.dashed === next.dashed;
+         p.dashed === next.dashed &&
+         lastPrev.latitude === lastNext.latitude &&
+         lastPrev.longitude === lastNext.longitude;
      }));
   
   const geofencesEqual = prevProps.geofences?.length === nextProps.geofences?.length &&

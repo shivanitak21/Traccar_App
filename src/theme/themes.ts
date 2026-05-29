@@ -11,10 +11,10 @@ export const darkColors = {
   surfaceElevated: '#2C2C2E',
   surfaceHover: '#3A3A3C',
 
-  primary: '#E8A84A',
-  primaryLight: '#F0BC6A',
-  primaryMuted: 'rgba(232, 168, 74, 0.14)',
-  primaryGlow: 'rgba(232, 168, 74, 0.22)',
+  primary: '#0A84FF',
+  primaryLight: '#409CFF',
+  primaryMuted: 'rgba(10, 132, 255, 0.14)',
+  primaryGlow: 'rgba(10, 132, 255, 0.22)',
 
   accent: '#FFFFFF',
   accentLight: '#F5F5F7',
@@ -25,8 +25,8 @@ export const darkColors = {
 
   success: '#30D158',
   successMuted: 'rgba(48, 209, 88, 0.14)',
-  warning: '#FF9F0A',
-  warningMuted: 'rgba(255, 159, 10, 0.14)',
+  warning: '#64D2FF',
+  warningMuted: 'rgba(100, 210, 255, 0.14)',
   error: '#D4956E',
   errorMuted: 'rgba(212, 149, 110, 0.14)',
   info: '#0A84FF',
@@ -38,8 +38,8 @@ export const darkColors = {
     tertiary: 'rgba(255, 255, 255, 0.38)',
     disabled: 'rgba(255, 255, 255, 0.22)',
     inverse: '#000000',
-    accent: '#E8A84A',
-    warning: '#FF9F0A',
+    accent: '#0A84FF',
+    warning: '#64D2FF',
     error: '#D4956E',
   },
 
@@ -48,7 +48,7 @@ export const darkColors = {
     subtle: 'rgba(255, 255, 255, 0.06)',
     strong: 'rgba(255, 255, 255, 0.16)',
     focus: 'rgba(255, 255, 255, 0.40)',
-    accent: 'rgba(232, 168, 74, 0.35)',
+    accent: 'rgba(10, 132, 255, 0.35)',
     alert: 'rgba(212, 149, 110, 0.22)',
   },
 
@@ -62,7 +62,7 @@ export const darkColors = {
   status: {
     online: '#30D158',
     offline: '#636366',
-    idle: '#FF9F0A',
+    idle: '#64D2FF',
     moving: '#0A84FF',
     unknown: '#8E8E93',
   },
@@ -71,17 +71,17 @@ export const darkColors = {
     dark: ['#000000', '#0A0A0A'] as const,
     darkDeep: ['#000000', '#000000'] as const,
     emerald: ['#30D158', '#248A3D'] as const,
-    amber: ['#FF9F0A', '#D4845C'] as const,
+    amber: ['#64D2FF', '#0A84FF'] as const,
     blue: ['#0A84FF', '#0066CC'] as const,
     card: ['rgba(28, 28, 30, 0.95)', 'rgba(10, 10, 10, 0.98)'] as const,
     surface: ['rgba(0, 0, 0, 0.0)', 'rgba(0, 0, 0, 0.85)'] as const,
     header: ['rgba(0, 0, 0, 0.92)', 'rgba(0, 0, 0, 0.0)'] as const,
     hero: ['rgba(0, 0, 0, 0.0)', 'rgba(0, 0, 0, 0.75)', '#000000'] as const,
     cta: ['#FFFFFF', '#F5F5F7'] as const,
-    brand: ['#E8A84A', '#C88520'] as const,
+    brand: ['#0A84FF', '#0056CC'] as const,
   },
 
-  chart: ['#30D158', '#0A84FF', '#FF9F0A', '#BF5AF2', '#D4956E', '#64D2FF'],
+  chart: ['#30D158', '#0A84FF', '#64D2FF', '#BF5AF2', '#D4956E', '#5AC8FA'],
 
   tabBar: {
     background: 'rgba(28, 28, 30, 0.88)',
@@ -102,10 +102,10 @@ export const lightColors = {
   surfaceElevated: '#F2F2F7',
   surfaceHover: '#E5E5EA',
 
-  primary: '#D4882A',
-  primaryLight: '#E89A3A',
-  primaryMuted: 'rgba(212, 136, 42, 0.12)',
-  primaryGlow: 'rgba(212, 136, 42, 0.18)',
+  primary: '#007AFF',
+  primaryLight: '#3395FF',
+  primaryMuted: 'rgba(0, 122, 255, 0.12)',
+  primaryGlow: 'rgba(0, 122, 255, 0.18)',
 
   accent: '#1C1C1E',
   accentLight: '#3A3A3C',
@@ -116,8 +116,8 @@ export const lightColors = {
 
   success: '#28A745',
   successMuted: 'rgba(40, 167, 69, 0.12)',
-  warning: '#F59E0B',
-  warningMuted: 'rgba(245, 158, 11, 0.12)',
+  warning: '#3B9EFF',
+  warningMuted: 'rgba(59, 158, 255, 0.12)',
   error: '#C0522A',
   errorMuted: 'rgba(192, 82, 42, 0.12)',
   info: '#007AFF',
@@ -129,8 +129,8 @@ export const lightColors = {
     tertiary: 'rgba(0, 0, 0, 0.35)',
     disabled: 'rgba(0, 0, 0, 0.22)',
     inverse: '#FFFFFF',
-    accent: '#D4882A',
-    warning: '#F59E0B',
+    accent: '#007AFF',
+    warning: '#3B9EFF',
     error: '#C0522A',
   },
 
@@ -139,7 +139,7 @@ export const lightColors = {
     subtle: 'rgba(0, 0, 0, 0.07)',
     strong: 'rgba(0, 0, 0, 0.20)',
     focus: 'rgba(0, 0, 0, 0.36)',
-    accent: 'rgba(212, 136, 42, 0.30)',
+    accent: 'rgba(0, 122, 255, 0.30)',
     alert: 'rgba(192, 82, 42, 0.20)',
   },
 
@@ -153,7 +153,7 @@ export const lightColors = {
   status: {
     online: '#28A745',
     offline: '#8E8E93',
-    idle: '#F59E0B',
+    idle: '#3B9EFF',
     moving: '#007AFF',
     unknown: '#8E8E93',
   },
@@ -162,17 +162,17 @@ export const lightColors = {
     dark: ['#F2F2F7', '#FFFFFF'] as const,
     darkDeep: ['#F2F2F7', '#F2F2F7'] as const,
     emerald: ['#28A745', '#1E7E34'] as const,
-    amber: ['#F59E0B', '#D97706'] as const,
+    amber: ['#3B9EFF', '#007AFF'] as const,
     blue: ['#007AFF', '#0056CC'] as const,
     card: ['rgba(255, 255, 255, 0.95)', 'rgba(242, 242, 247, 0.98)'] as const,
     surface: ['rgba(242, 242, 247, 0.0)', 'rgba(242, 242, 247, 0.85)'] as const,
     header: ['rgba(242, 242, 247, 0.92)', 'rgba(242, 242, 247, 0.0)'] as const,
     hero: ['rgba(242, 242, 247, 0.0)', 'rgba(242, 242, 247, 0.75)', '#F2F2F7'] as const,
     cta: ['#1C1C1E', '#3A3A3C'] as const,
-    brand: ['#D4882A', '#B8721E'] as const,
+    brand: ['#007AFF', '#0056CC'] as const,
   },
 
-  chart: ['#28A745', '#007AFF', '#F59E0B', '#8B5CF6', '#C0522A', '#0EA5E9'],
+  chart: ['#28A745', '#007AFF', '#3B9EFF', '#8B5CF6', '#C0522A', '#0EA5E9'],
 
   tabBar: {
     background: 'rgba(255, 255, 255, 0.92)',

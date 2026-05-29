@@ -13,6 +13,7 @@ import { formatSpeed } from '../utils/units';
 import { resolveAddressForPosition, getLocationLabel } from '../utils/address';
 import { useTabBarBottomInset } from '../utils/tabBarInset';
 import { getThemeBaseMapLayer, resolveMapLayer } from '../utils/mapTheme';
+import { mergePositionHistory, positionsToPath } from '../utils/positionHistory';
 
 const DEFAULT_MAP_CENTER = { latitude: 20.5937, longitude: 78.9629 };
 
@@ -31,6 +32,7 @@ export const MapScreen: React.FC = () => {
   const [mapLayer, setMapLayer] = useState<MapLayerType>(themeBaseLayer);
   const [showLayerSelector, setShowLayerSelector] = useState(false);
   const [deviceAddresses, setDeviceAddresses] = useState<Map<number, string>>(new Map());
+  const [positionTrails, setPositionTrails] = useState<Map<number, TraccarPosition[]>>(new Map());
 
   useEffect(() => {
     setMapLayer(prev => resolveMapLayer(prev, isDark));
@@ -54,6 +56,14 @@ export const MapScreen: React.FC = () => {
       );
       setPositions(posMap);
       setDeviceAddresses(addressMap);
+      setPositionTrails(prev => {
+        const next = new Map(prev);
+        positionsData.forEach(pos => {
+          const existing = next.get(pos.deviceId) ?? [];
+          next.set(pos.deviceId, mergePositionHistory(existing, pos));
+        });
+        return next;
+      });
     } catch (error) {
       console.error('Failed to load map data:', error);
     } finally {
@@ -64,24 +74,57 @@ export const MapScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     traccarWS.connect();
-    const handlePositionUpdate = async (updatedPositions: TraccarPosition[]) => {
-      const posMap = new Map(positions);
-      const addressMap = new Map(deviceAddresses);
-      await Promise.all(
+    const handlePositionUpdate = (updatedPositions: TraccarPosition[]) => {
+      setPositions(prev => {
+        const posMap = new Map(prev);
+        updatedPositions.forEach(pos => posMap.set(pos.deviceId, pos));
+        return posMap;
+      });
+
+      setPositionTrails(prev => {
+        const next = new Map(prev);
+        updatedPositions.forEach(pos => {
+          const existing = next.get(pos.deviceId) ?? [];
+          next.set(pos.deviceId, mergePositionHistory(existing, pos));
+        });
+        return next;
+      });
+
+      void Promise.all(
         updatedPositions.map(async (pos) => {
-          posMap.set(pos.deviceId, pos);
-          if (!addressMap.has(pos.deviceId) || pos.address) {
-            const address = await resolveAddressForPosition(pos);
-            if (address) addressMap.set(pos.deviceId, address);
-          }
-        })
+          const resolvedAddress = await resolveAddressForPosition(pos);
+          if (!resolvedAddress) return;
+          setDeviceAddresses(prev => {
+            const next = new Map(prev);
+            next.set(pos.deviceId, resolvedAddress);
+            return next;
+          });
+        }),
       );
-      setPositions(posMap);
-      setDeviceAddresses(addressMap);
     };
     traccarWS.on('positions', handlePositionUpdate);
     return () => { traccarWS.off('positions', handlePositionUpdate); };
   }, []);
+
+  useEffect(() => {
+    if (!selectedDeviceId) return;
+
+    const loadTrail = async () => {
+      const to = new Date();
+      const from = new Date(to.getTime() - 60 * 60 * 1000);
+      const route = await traccarAPI.getReportRoute(selectedDeviceId, from.toISOString(), to.toISOString()).catch(() => []);
+      if (route.length === 0) return;
+
+      setPositionTrails(prev => {
+        const next = new Map(prev);
+        const existing = next.get(selectedDeviceId) ?? [];
+        next.set(selectedDeviceId, mergePositionHistory(existing, route, 120));
+        return next;
+      });
+    };
+
+    void loadTrail();
+  }, [selectedDeviceId]);
 
   const getMapCenter = () => {
     if (selectedDeviceId) {
@@ -140,6 +183,20 @@ export const MapScreen: React.FC = () => {
   const mapMarkers = getMarkers();
   const shouldFitAllMarkers = !selectedDeviceId && mapMarkers.length > 0;
 
+  const polylines = useMemo(() => {
+    if (!selectedDeviceId) return [];
+    const trail = positionTrails.get(selectedDeviceId) ?? [];
+    const coordinates = positionsToPath(trail);
+    if (coordinates.length < 2) return [];
+    return [{
+      id: 'trail',
+      coordinates,
+      color: '#22c55e',
+      width: 6,
+      opacity: 1,
+    }];
+  }, [selectedDeviceId, positionTrails]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -154,6 +211,7 @@ export const MapScreen: React.FC = () => {
       <View style={styles.mapContainer}>
         <WebMapView
           markers={mapMarkers}
+          polylines={polylines}
           center={getMapCenter()}
           zoom={getMapZoom()}
           fitToMarkers={shouldFitAllMarkers}
