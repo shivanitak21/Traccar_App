@@ -7,12 +7,12 @@ import { StatusChip } from './ui/StatusChip';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { radius } from '../theme/radius';
-import { TraccarDevice } from '../api/traccar';
+import { ElevaticsDevice } from '../api/elevatics';
 import { Navigation, Play, MapPinned, Info, Radio } from 'lucide-react-native';
 import { getVehicleImageUrl } from '../utils/vehicleImages';
 
 interface DeviceCardProps {
-  device: TraccarDevice;
+  device: ElevaticsDevice;
   index: number;
   onLiveTrack: () => void;
   onPlayback: () => void;

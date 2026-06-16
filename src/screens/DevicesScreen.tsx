@@ -33,8 +33,8 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ControlButton, ControlButtonRow } from '../components/ui/ControlButton';
 import { StatusChip } from '../components/ui/StatusChip';
 import { DeviceCardSkeleton } from '../components/ui/SkeletonLoader';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { useFleetStore, DeviceWithPosition } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { useCompanionStore } from '../stores/companionStore';
@@ -74,8 +74,8 @@ export const DevicesScreen: React.FC = () => {
     if (isRefresh) setRefreshing(true);
     try {
       const [devicesData, positionsData] = await Promise.all([
-        traccarAPI.getDevices(),
-        traccarAPI.getPositions(),
+        elevaticsAPI.getDevices(),
+        elevaticsAPI.getPositions(),
       ]);
       updatePositions(positionsData);
       setDevices(devicesData);
@@ -89,13 +89,13 @@ export const DevicesScreen: React.FC = () => {
 
   useEffect(() => {
     loadDevices();
-    const handleDevices = (d: TraccarDevice[]) => updateDevices(d);
-    const handlePositions = (p: TraccarPosition[]) => updatePositions(p);
-    traccarWS.on('devices', handleDevices);
-    traccarWS.on('positions', handlePositions);
+    const handleDevices = (d: ElevaticsDevice[]) => updateDevices(d);
+    const handlePositions = (p: ElevaticsPosition[]) => updatePositions(p);
+    elevaticsWS.on('devices', handleDevices);
+    elevaticsWS.on('positions', handlePositions);
     return () => {
-      traccarWS.off('devices', handleDevices);
-      traccarWS.off('positions', handlePositions);
+      elevaticsWS.off('devices', handleDevices);
+      elevaticsWS.off('positions', handlePositions);
     };
   }, []);
 

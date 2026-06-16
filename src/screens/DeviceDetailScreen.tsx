@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { Navigation, MapPin, Clock, Activity, Gauge } from 'lucide-react-native';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
@@ -29,8 +29,8 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { prefs } = usePrefsStore();
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [position, setPosition] = useState<TraccarPosition | null>(null);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [position, setPosition] = useState<ElevaticsPosition | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +38,7 @@ export const DeviceDetailScreen: React.FC<DeviceDetailScreenProps> = ({ route })
 
   const loadDeviceDetail = async () => {
     try {
-      const [deviceData, positionsData] = await Promise.all([traccarAPI.getDevice(deviceId), traccarAPI.getPositions(deviceId)]);
+      const [deviceData, positionsData] = await Promise.all([elevaticsAPI.getDevice(deviceId), elevaticsAPI.getPositions(deviceId)]);
       setDevice(deviceData);
       if (positionsData.length > 0) {
         const latest = positionsData[0];

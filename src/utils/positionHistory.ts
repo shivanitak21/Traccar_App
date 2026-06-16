@@ -1,12 +1,12 @@
-import { TraccarPosition } from '../api/traccar';
+import { ElevaticsPosition } from '../api/elevatics';
 
 export function mergePositionHistory(
-  prev: TraccarPosition[],
-  incoming: TraccarPosition | TraccarPosition[],
+  prev: ElevaticsPosition[],
+  incoming: ElevaticsPosition | ElevaticsPosition[],
   maxPoints = 30,
-): TraccarPosition[] {
+): ElevaticsPosition[] {
   const incomingList = Array.isArray(incoming) ? incoming : [incoming];
-  const byId = new Map<number, TraccarPosition>();
+  const byId = new Map<number, ElevaticsPosition>();
 
   for (const position of [...prev, ...incomingList]) {
     if (position.latitude && position.longitude) {
@@ -19,6 +19,6 @@ export function mergePositionHistory(
     .slice(-maxPoints);
 }
 
-export function positionsToPath(positions: TraccarPosition[]) {
+export function positionsToPath(positions: ElevaticsPosition[]) {
   return positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }));
 }

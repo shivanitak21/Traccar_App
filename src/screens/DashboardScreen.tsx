@@ -39,8 +39,8 @@ import { StatusChip } from '../components/ui/StatusChip';
 import { DeviceCardSkeleton } from '../components/ui/SkeletonLoader';
 import { WebMapView, MapLayerType } from '../components/WebMapView';
 import { AlertsPanel, getUnreadAlertCount } from '../components/AlertsPanel';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { useCompanionStore } from '../stores/companionStore';
@@ -106,8 +106,8 @@ export const DashboardScreen: React.FC = () => {
     if (isRefresh) setRefreshing(true);
     try {
       const [devicesData, positionsData] = await Promise.all([
-        traccarAPI.getDevices(),
-        traccarAPI.getPositions(),
+        elevaticsAPI.getDevices(),
+        elevaticsAPI.getPositions(),
       ]);
       updatePositions(positionsData);
       setDevices(devicesData);
@@ -126,23 +126,23 @@ export const DashboardScreen: React.FC = () => {
     }
 
     loadData();
-    traccarWS.connect();
+    elevaticsWS.connect();
 
     const handleConnected = (connected: boolean) => setWsConnected(connected);
-    const handleDevices = (d: TraccarDevice[]) => updateDevices(d);
-    const handlePositions = (p: TraccarPosition[]) => updatePositions(p);
+    const handleDevices = (d: ElevaticsDevice[]) => updateDevices(d);
+    const handlePositions = (p: ElevaticsPosition[]) => updatePositions(p);
     const handleEvents = (e: any[]) => addEvents(e);
 
-    traccarWS.on('connected', handleConnected);
-    traccarWS.on('devices', handleDevices);
-    traccarWS.on('positions', handlePositions);
-    traccarWS.on('events', handleEvents);
+    elevaticsWS.on('connected', handleConnected);
+    elevaticsWS.on('devices', handleDevices);
+    elevaticsWS.on('positions', handlePositions);
+    elevaticsWS.on('events', handleEvents);
 
     return () => {
-      traccarWS.off('connected', handleConnected);
-      traccarWS.off('devices', handleDevices);
-      traccarWS.off('positions', handlePositions);
-      traccarWS.off('events', handleEvents);
+      elevaticsWS.off('connected', handleConnected);
+      elevaticsWS.off('devices', handleDevices);
+      elevaticsWS.off('positions', handlePositions);
+      elevaticsWS.off('events', handleEvents);
     };
   }, [isAuthenticated, loadData, setWsConnected, updateDevices, updatePositions, addEvents]);
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { sanitizeBrandText } from '../utils/brandText';
 import {
   sendCompanionChat,
   CompanionContentBlock,
@@ -178,19 +179,23 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
         userId,
         context,
         onToken: (_token, accumulated) => {
+          const display = sanitizeBrandText(preferAddressInText(accumulated, knownAddress));
           set(state => ({
             messages: state.messages.map(msg =>
               msg.id === assistantId
                 ? {
                     ...msg,
-                    text: preferAddressInText(accumulated, knownAddress),
-                    blocks: [{ type: 'text', content: preferAddressInText(accumulated, knownAddress) }],
+                    text: display,
+                    blocks: [{ type: 'text', content: display }],
                   }
                 : msg
             ),
           }));
         },
       });
+
+      const displayText = (text: string) =>
+        sanitizeBrandText(preferAddressInText(text, knownAddress));
 
       set(state => ({
         threadId: result.threadId ?? state.threadId,
@@ -200,14 +205,14 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
             ? {
                 ...msg,
                 streaming: false,
-                text: preferAddressInText(result.rawText, knownAddress),
+                text: displayText(result.rawText),
                 blocks: result.blocks.length > 0
                   ? result.blocks.map(block =>
                       block.type === 'text'
-                        ? { ...block, content: preferAddressInText(block.content, knownAddress) }
+                        ? { ...block, content: displayText(block.content) }
                         : block
                     )
-                  : [{ type: 'text', content: preferAddressInText(result.rawText || 'No response received.', knownAddress) }],
+                  : [{ type: 'text', content: displayText(result.rawText || 'No response received.') }],
               }
             : msg
         ),
@@ -223,7 +228,7 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
                 error: true,
                 blocks: [{
                   type: 'text',
-                  content: error?.message ?? 'Failed to reach AI companion. Please try again.',
+                  content: sanitizeBrandText(error?.message ?? 'Failed to reach AI companion. Please try again.'),
                 }],
               }
             : msg

@@ -18,16 +18,16 @@ import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
-import { traccarAPI, TraccarDriver } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDriver } from '../api/elevatics';
 
 export const DriversScreen: React.FC = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [drivers, setDrivers] = useState<TraccarDriver[]>([]);
+  const [drivers, setDrivers] = useState<ElevaticsDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editing, setEditing] = useState<TraccarDriver | null>(null);
+  const [editing, setEditing] = useState<ElevaticsDriver | null>(null);
   const [name, setName] = useState('');
   const [uniqueId, setUniqueId] = useState('');
   const [phone, setPhone] = useState('');
@@ -36,7 +36,7 @@ export const DriversScreen: React.FC = () => {
   const loadDrivers = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await traccarAPI.getDrivers();
+      const data = await elevaticsAPI.getDrivers();
       setDrivers(data);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to load drivers');
@@ -52,7 +52,7 @@ export const DriversScreen: React.FC = () => {
     setModalVisible(true);
   };
 
-  const openEdit = (driver: TraccarDriver) => {
+  const openEdit = (driver: ElevaticsDriver) => {
     setEditing(driver); setName(driver.name); setUniqueId(driver.uniqueId);
     setPhone(String(driver.attributes?.phone || '')); setEmail(String(driver.attributes?.email || ''));
     setModalVisible(true);
@@ -62,17 +62,17 @@ export const DriversScreen: React.FC = () => {
     if (!name.trim() || !uniqueId.trim()) { Alert.alert('Validation', 'Name and unique ID are required'); return; }
     try {
       const payload = { name: name.trim(), uniqueId: uniqueId.trim(), attributes: { phone: phone.trim(), email: email.trim() } };
-      if (editing) { await traccarAPI.updateDriver(editing.id, { ...editing, ...payload }); }
-      else { await traccarAPI.createDriver(payload); }
+      if (editing) { await elevaticsAPI.updateDriver(editing.id, { ...editing, ...payload }); }
+      else { await elevaticsAPI.createDriver(payload); }
       setModalVisible(false); loadDrivers();
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to save driver'); }
   };
 
-  const deleteDriver = (driver: TraccarDriver) => {
+  const deleteDriver = (driver: ElevaticsDriver) => {
     Alert.alert('Delete driver', `Remove ${driver.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await traccarAPI.deleteDriver(driver.id); loadDrivers(); }
+        try { await elevaticsAPI.deleteDriver(driver.id); loadDrivers(); }
         catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete driver'); }
       }},
     ]);

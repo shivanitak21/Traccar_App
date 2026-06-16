@@ -56,7 +56,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "traccarBaseUrl": "https://elevaticsiot.com",
+      "elevaticsIotBaseUrl": "https://elevaticsiot.com",
       "mapboxPublicToken": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw",
       "router": {},
       "eas": {

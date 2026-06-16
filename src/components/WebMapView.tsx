@@ -451,7 +451,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
 
     function parseGeofenceArea(area) {
       try {
-        // Traccar geofence area format: "CIRCLE (lat lon radius)" or "POLYGON ((lat1 lon1, lat2 lon2, ...))"
+        // Elevatics IoT geofence area format: "CIRCLE (lat lon radius)" or "POLYGON ((lat1 lon1, lat2 lon2, ...))"
         if (area.startsWith('CIRCLE')) {
           const match = area.match(/CIRCLE\\s*\\(([^)]+)\\)/);
           if (match) {
@@ -684,7 +684,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           drawnItems.clearLayers();
           drawnItems.addLayer(layer);
           
-          // Convert to Traccar format
+          // Convert to Elevatics IoT format
           const latlngs = layer.getLatLngs()[0];
           const coords = latlngs.map(ll => ll.lat + ' ' + ll.lng).join(', ');
           const area = 'POLYGON ((' + coords + '))';
@@ -703,7 +703,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
            drawnItems.clearLayers();
            drawnItems.addLayer(layer);
            
-           // Convert rectangle to Traccar POLYGON format
+           // Convert rectangle to Elevatics IoT POLYGON format
            // Get the bounds of the rectangle
            const bounds = layer.getBounds();
            const sw = bounds.getSouthWest(); // Southwest corner

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Navigation, Zap, MapPin, X } from 'lucide-react-native';
@@ -25,7 +25,7 @@ interface LiveTrackingScreenProps {
   onClose?: () => void;
 }
 
-function matchesDeviceId(position: TraccarPosition, deviceId: number) {
+function matchesDeviceId(position: ElevaticsPosition, deviceId: number) {
   return Number(position.deviceId) === Number(deviceId);
 }
 
@@ -35,17 +35,17 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
   const fleetPosition = useFleetStore(state => state.positions.get(deviceId) ?? null);
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [position, setPosition] = useState<TraccarPosition | null>(null);
-  const [positionHistory, setPositionHistory] = useState<TraccarPosition[]>([]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [position, setPosition] = useState<ElevaticsPosition | null>(null);
+  const [positionHistory, setPositionHistory] = useState<ElevaticsPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [address, setAddress] = useState<string | null>(null);
   const [initialCenter, setInitialCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastAppliedPositionIdRef = useRef<number | null>(null);
-  const positionRef = useRef<TraccarPosition | null>(null);
+  const positionRef = useRef<ElevaticsPosition | null>(null);
   positionRef.current = position;
 
-  const applyPositionUpdate = useCallback((devicePosition: TraccarPosition, refreshAddress = true) => {
+  const applyPositionUpdate = useCallback((devicePosition: ElevaticsPosition, refreshAddress = true) => {
     setPosition(devicePosition);
     setPositionHistory(prev => mergePositionHistory(prev, devicePosition, MAX_TRAIL_POINTS));
     lastAppliedPositionIdRef.current = devicePosition.id;
@@ -62,9 +62,9 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
         const to = new Date();
         const from = new Date(to.getTime() - LIVE_TRAIL_HOURS * 60 * 60 * 1000);
         const [deviceData, positions, routeData] = await Promise.all([
-          traccarAPI.getDevice(deviceId),
-          traccarAPI.getPositions(deviceId),
-          traccarAPI.getReportRoute(deviceId, from.toISOString(), to.toISOString()).catch(() => []),
+          elevaticsAPI.getDevice(deviceId),
+          elevaticsAPI.getPositions(deviceId),
+          elevaticsAPI.getReportRoute(deviceId, from.toISOString(), to.toISOString()).catch(() => []),
         ]);
         setDevice(deviceData);
 
@@ -86,17 +86,17 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
     };
 
     loadData();
-    traccarWS.connect();
+    elevaticsWS.connect();
 
-    const handlePositionUpdate = (updatedPositions: TraccarPosition[]) => {
+    const handlePositionUpdate = (updatedPositions: ElevaticsPosition[]) => {
       const devicePosition = updatedPositions.find(p => matchesDeviceId(p, deviceId));
       if (!devicePosition) return;
       updatePositions([devicePosition]);
       applyPositionUpdate(devicePosition);
     };
 
-    traccarWS.on('positions', handlePositionUpdate);
-    return () => { traccarWS.off('positions', handlePositionUpdate); };
+    elevaticsWS.on('positions', handlePositionUpdate);
+    return () => { elevaticsWS.off('positions', handlePositionUpdate); };
   }, [deviceId, applyPositionUpdate, updatePositions]);
 
   useEffect(() => {
@@ -110,7 +110,7 @@ export const LiveTrackingScreen: React.FC<LiveTrackingScreenProps> = ({ deviceId
 
     const pollLatestPosition = async () => {
       try {
-        const positions = await traccarAPI.getPositions(deviceId);
+        const positions = await elevaticsAPI.getPositions(deviceId);
         const latest = positions[0];
         if (!latest) return;
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { sanitizeBrandText } from '../utils/brandText';
 import {
   View,
   Text,
@@ -190,7 +191,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
             {error && (
               <Animated.View entering={FadeIn.duration(300)} style={styles.errorBanner}>
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>{sanitizeBrandText(error)}</Text>
               </Animated.View>
             )}
 

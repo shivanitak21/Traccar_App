@@ -1,5 +1,5 @@
 import { reverseGeocode, primeAddressCache } from './geocoding';
-import type { TraccarPosition } from '../api/traccar';
+import type { ElevaticsPosition } from '../api/elevatics';
 
 const RESOLVING_LABEL = 'Resolving address...';
 const UNAVAILABLE_LABEL = 'Address unavailable';
@@ -17,7 +17,7 @@ export function getLocationLabel(options: {
 }
 
 export async function resolveAddressForPosition(
-  position: Pick<TraccarPosition, 'latitude' | 'longitude' | 'address'>,
+  position: Pick<ElevaticsPosition, 'latitude' | 'longitude' | 'address'>,
 ): Promise<string | null> {
   if (position.address?.trim()) {
     primeAddressCache(position.latitude, position.longitude, position.address);
@@ -28,7 +28,7 @@ export async function resolveAddressForPosition(
 
 /** Resolve addresses one-by-one to respect geocoder rate limits. */
 export async function resolveAddressesForPositions(
-  positions: TraccarPosition[],
+  positions: ElevaticsPosition[],
   onResolved: (deviceId: number, address: string) => void,
   shouldSkip?: (deviceId: number) => boolean,
 ): Promise<void> {

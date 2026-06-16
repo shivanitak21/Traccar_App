@@ -1,10 +1,11 @@
 import { storage } from '../utils/storage';
 import { API_CONFIG } from './config';
 import { normalizeServerUrl } from '../utils/serverUrl';
+import { sanitizeBrandText } from '../utils/brandText';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export interface TraccarDevice {
+export interface ElevaticsDevice {
   id: number;
   name: string;
   uniqueId: string;
@@ -20,7 +21,7 @@ export interface TraccarDevice {
   attributes?: Record<string, any>;
 }
 
-export interface TraccarPosition {
+export interface ElevaticsPosition {
   id: number;
   deviceId: number;
   protocol: string;
@@ -39,7 +40,7 @@ export interface TraccarPosition {
   attributes: Record<string, any>;
 }
 
-export interface TraccarGeofence {
+export interface ElevaticsGeofence {
   id: number;
   name: string;
   description?: string;
@@ -48,7 +49,7 @@ export interface TraccarGeofence {
   attributes: Record<string, any>;
 }
 
-export interface TraccarEvent {
+export interface ElevaticsEvent {
   id: number;
   type: string;
   eventTime: string;
@@ -59,7 +60,7 @@ export interface TraccarEvent {
   attributes: Record<string, any>;
 }
 
-export interface TraccarUser {
+export interface ElevaticsUser {
   id: number;
   name: string;
   email: string;
@@ -74,7 +75,7 @@ export interface TraccarUser {
   attributes?: Record<string, any>;
 }
 
-export interface TraccarTrip {
+export interface ElevaticsTrip {
   deviceId: number;
   deviceName: string;
   maxSpeed: number;
@@ -96,7 +97,7 @@ export interface TraccarTrip {
   spentFuel?: number;
 }
 
-export interface TraccarStop {
+export interface ElevaticsStop {
   deviceId: number;
   deviceName: string;
   duration: number;
@@ -109,7 +110,7 @@ export interface TraccarStop {
   engineHours?: number;
 }
 
-export interface TraccarSummary {
+export interface ElevaticsSummary {
   deviceId: number;
   deviceName: string;
   maxSpeed: number;
@@ -121,14 +122,14 @@ export interface TraccarSummary {
   engineHours?: number;
 }
 
-export interface TraccarDriver {
+export interface ElevaticsDriver {
   id: number;
   name: string;
   uniqueId: string;
   attributes?: Record<string, any>;
 }
 
-export interface TraccarNotification {
+export interface ElevaticsNotification {
   id: number;
   type: string;
   always: boolean;
@@ -139,14 +140,14 @@ export interface TraccarNotification {
   attributes?: Record<string, any>;
 }
 
-export interface TraccarGroup {
+export interface ElevaticsGroup {
   id: number;
   name: string;
   groupId?: number;
   attributes?: Record<string, any>;
 }
 
-export interface TraccarPermission {
+export interface ElevaticsPermission {
   userId?: number;
   deviceId?: number;
   groupId?: number;
@@ -161,7 +162,7 @@ export interface TraccarPermission {
 
 // ── API Client ─────────────────────────────────────────────────────────────────
 
-class TraccarAPI {
+class ElevaticsAPI {
   private baseUrl: string = API_CONFIG.DEFAULT_BASE_URL;
   private authHeader: string = '';
   private sessionCookie: string = '';
@@ -227,7 +228,7 @@ class TraccarAPI {
       } catch {
         // keep raw text
       }
-      throw new Error(message);
+      throw new Error(sanitizeBrandText(message));
     }
 
     const contentType = response.headers.get('content-type') ?? '';
@@ -245,7 +246,7 @@ class TraccarAPI {
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
 
-  async login(email: string, password: string): Promise<TraccarUser> {
+  async login(email: string, password: string): Promise<ElevaticsUser> {
     const formData = new URLSearchParams();
     formData.append('email', email);
     formData.append('password', password);
@@ -270,7 +271,7 @@ class TraccarAPI {
       }
     }
 
-    const user: TraccarUser = await response.json();
+    const user: ElevaticsUser = await response.json();
 
     const authString = `${email}:${password}`;
     this.authHeader = `Basic ${btoa(authString)}`;
@@ -294,24 +295,24 @@ class TraccarAPI {
 
   // ── Devices ──────────────────────────────────────────────────────────────────
 
-  async getDevices(): Promise<TraccarDevice[]> {
-    return this.request<TraccarDevice[]>('/api/devices');
+  async getDevices(): Promise<ElevaticsDevice[]> {
+    return this.request<ElevaticsDevice[]>('/api/devices');
   }
 
-  async getDevice(id: number): Promise<TraccarDevice> {
-    return this.request<TraccarDevice>(`/api/devices/${id}`);
+  async getDevice(id: number): Promise<ElevaticsDevice> {
+    return this.request<ElevaticsDevice>(`/api/devices/${id}`);
   }
 
-  async createDevice(device: Partial<TraccarDevice>): Promise<TraccarDevice> {
-    return this.request<TraccarDevice>('/api/devices', {
+  async createDevice(device: Partial<ElevaticsDevice>): Promise<ElevaticsDevice> {
+    return this.request<ElevaticsDevice>('/api/devices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(device),
     });
   }
 
-  async updateDevice(id: number, device: Partial<TraccarDevice>): Promise<TraccarDevice> {
-    return this.request<TraccarDevice>(`/api/devices/${id}`, {
+  async updateDevice(id: number, device: Partial<ElevaticsDevice>): Promise<ElevaticsDevice> {
+    return this.request<ElevaticsDevice>(`/api/devices/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(device),
@@ -324,31 +325,31 @@ class TraccarAPI {
 
   // ── Positions ─────────────────────────────────────────────────────────────────
 
-  async getPositions(deviceId?: number): Promise<TraccarPosition[]> {
+  async getPositions(deviceId?: number): Promise<ElevaticsPosition[]> {
     const query = deviceId ? `?deviceId=${deviceId}` : '';
-    return this.request<TraccarPosition[]>(`/api/positions${query}`);
+    return this.request<ElevaticsPosition[]>(`/api/positions${query}`);
   }
 
   // ── Geofences ─────────────────────────────────────────────────────────────────
 
-  async getGeofences(): Promise<TraccarGeofence[]> {
-    return this.request<TraccarGeofence[]>('/api/geofences');
+  async getGeofences(): Promise<ElevaticsGeofence[]> {
+    return this.request<ElevaticsGeofence[]>('/api/geofences');
   }
 
-  async getGeofence(id: number): Promise<TraccarGeofence> {
-    return this.request<TraccarGeofence>(`/api/geofences/${id}`);
+  async getGeofence(id: number): Promise<ElevaticsGeofence> {
+    return this.request<ElevaticsGeofence>(`/api/geofences/${id}`);
   }
 
-  async createGeofence(geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
-    return this.request<TraccarGeofence>('/api/geofences', {
+  async createGeofence(geofence: Partial<ElevaticsGeofence>): Promise<ElevaticsGeofence> {
+    return this.request<ElevaticsGeofence>('/api/geofences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geofence),
     });
   }
 
-  async updateGeofence(id: number, geofence: Partial<TraccarGeofence>): Promise<TraccarGeofence> {
-    return this.request<TraccarGeofence>(`/api/geofences/${id}`, {
+  async updateGeofence(id: number, geofence: Partial<ElevaticsGeofence>): Promise<ElevaticsGeofence> {
+    return this.request<ElevaticsGeofence>(`/api/geofences/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geofence),
@@ -361,48 +362,48 @@ class TraccarAPI {
 
   // ── Events ────────────────────────────────────────────────────────────────────
 
-  async getEvents(deviceId?: number, from?: string, to?: string): Promise<TraccarEvent[]> {
+  async getEvents(deviceId?: number, from?: string, to?: string): Promise<ElevaticsEvent[]> {
     const params = new URLSearchParams();
     if (deviceId) params.append('deviceId', String(deviceId));
     if (from) params.append('from', from);
     if (to) params.append('to', to);
     const qs = params.toString();
-    return this.request<TraccarEvent[]>(`/api/events${qs ? `?${qs}` : ''}`);
+    return this.request<ElevaticsEvent[]>(`/api/events${qs ? `?${qs}` : ''}`);
   }
 
   // ── Reports ───────────────────────────────────────────────────────────────────
 
-  async getRoute(deviceId: number, from: string, to: string): Promise<TraccarPosition[]> {
+  async getRoute(deviceId: number, from: string, to: string): Promise<ElevaticsPosition[]> {
     const params = new URLSearchParams({ deviceId: String(deviceId), from, to });
-    return this.request<TraccarPosition[]>(`/api/positions?${params}`);
+    return this.request<ElevaticsPosition[]>(`/api/positions?${params}`);
   }
 
-  async getReportRoute(deviceId: number, from: string, to: string): Promise<TraccarPosition[]> {
+  async getReportRoute(deviceId: number, from: string, to: string): Promise<ElevaticsPosition[]> {
     const params = new URLSearchParams({ deviceId: String(deviceId), from, to });
-    return this.request<TraccarPosition[]>(`/api/reports/route?${params}`);
+    return this.request<ElevaticsPosition[]>(`/api/reports/route?${params}`);
   }
 
-  async getReportTrips(deviceId: number, from: string, to: string): Promise<TraccarTrip[]> {
+  async getReportTrips(deviceId: number, from: string, to: string): Promise<ElevaticsTrip[]> {
     const qs = this.buildReportQuery(deviceId, from, to);
-    const data = await this.request<TraccarTrip[]>(`/api/reports/trips?${qs}`);
+    const data = await this.request<ElevaticsTrip[]>(`/api/reports/trips?${qs}`);
     return Array.isArray(data) ? data : [];
   }
 
-  async getReportSummary(deviceId: number, from: string, to: string): Promise<TraccarSummary[]> {
+  async getReportSummary(deviceId: number, from: string, to: string): Promise<ElevaticsSummary[]> {
     const qs = this.buildReportQuery(deviceId, from, to);
-    const data = await this.request<TraccarSummary[]>(`/api/reports/summary?${qs}`);
+    const data = await this.request<ElevaticsSummary[]>(`/api/reports/summary?${qs}`);
     return Array.isArray(data) ? data : [];
   }
 
-  async getReportStops(deviceId: number, from: string, to: string): Promise<TraccarStop[]> {
+  async getReportStops(deviceId: number, from: string, to: string): Promise<ElevaticsStop[]> {
     const qs = this.buildReportQuery(deviceId, from, to);
-    const data = await this.request<TraccarStop[]>(`/api/reports/stops?${qs}`);
+    const data = await this.request<ElevaticsStop[]>(`/api/reports/stops?${qs}`);
     return Array.isArray(data) ? data : [];
   }
 
-  async getReportEvents(deviceId: number, from: string, to: string): Promise<TraccarEvent[]> {
+  async getReportEvents(deviceId: number, from: string, to: string): Promise<ElevaticsEvent[]> {
     const qs = this.buildReportQuery(deviceId, from, to);
-    const data = await this.request<TraccarEvent[]>(`/api/reports/events?${qs}`);
+    const data = await this.request<ElevaticsEvent[]>(`/api/reports/events?${qs}`);
     return Array.isArray(data) ? data : [];
   }
 
@@ -423,20 +424,20 @@ class TraccarAPI {
 
   // ── Drivers ───────────────────────────────────────────────────────────────────
 
-  async getDrivers(): Promise<TraccarDriver[]> {
-    return this.request<TraccarDriver[]>('/api/drivers');
+  async getDrivers(): Promise<ElevaticsDriver[]> {
+    return this.request<ElevaticsDriver[]>('/api/drivers');
   }
 
-  async createDriver(driver: Partial<TraccarDriver>): Promise<TraccarDriver> {
-    return this.request<TraccarDriver>('/api/drivers', {
+  async createDriver(driver: Partial<ElevaticsDriver>): Promise<ElevaticsDriver> {
+    return this.request<ElevaticsDriver>('/api/drivers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(driver),
     });
   }
 
-  async updateDriver(id: number, driver: Partial<TraccarDriver>): Promise<TraccarDriver> {
-    return this.request<TraccarDriver>(`/api/drivers/${id}`, {
+  async updateDriver(id: number, driver: Partial<ElevaticsDriver>): Promise<ElevaticsDriver> {
+    return this.request<ElevaticsDriver>(`/api/drivers/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(driver),
@@ -449,36 +450,36 @@ class TraccarAPI {
 
   // ── Notifications ─────────────────────────────────────────────────────────────
 
-  async getNotifications(): Promise<TraccarNotification[]> {
-    return this.request<TraccarNotification[]>('/api/notifications');
+  async getNotifications(): Promise<ElevaticsNotification[]> {
+    return this.request<ElevaticsNotification[]>('/api/notifications');
   }
 
   // ── Groups ────────────────────────────────────────────────────────────────────
 
-  async getGroups(): Promise<TraccarGroup[]> {
-    return this.request<TraccarGroup[]>('/api/groups');
+  async getGroups(): Promise<ElevaticsGroup[]> {
+    return this.request<ElevaticsGroup[]>('/api/groups');
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────────
 
-  async getUsers(): Promise<TraccarUser[]> {
-    return this.request<TraccarUser[]>('/api/users');
+  async getUsers(): Promise<ElevaticsUser[]> {
+    return this.request<ElevaticsUser[]>('/api/users');
   }
 
-  async getSession(): Promise<TraccarUser> {
-    return this.request<TraccarUser>('/api/session');
+  async getSession(): Promise<ElevaticsUser> {
+    return this.request<ElevaticsUser>('/api/session');
   }
 
-  async updateUser(id: number, user: Partial<TraccarUser>): Promise<TraccarUser> {
-    return this.request<TraccarUser>(`/api/users/${id}`, {
+  async updateUser(id: number, user: Partial<ElevaticsUser>): Promise<ElevaticsUser> {
+    return this.request<ElevaticsUser>(`/api/users/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user),
     });
   }
 
-  async createUser(user: Partial<TraccarUser> & { password?: string }): Promise<TraccarUser> {
-    return this.request<TraccarUser>('/api/users', {
+  async createUser(user: Partial<ElevaticsUser> & { password?: string }): Promise<ElevaticsUser> {
+    return this.request<ElevaticsUser>('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user),
@@ -490,9 +491,9 @@ class TraccarAPI {
   }
 
   // ── Permissions ─────────────────────────────────────────────────────────────
-  // Traccar requires exactly two *Id query params (use 0 for "any" on one side).
+  // Elevatics IoT requires exactly two *Id query params (use 0 for "any" on one side).
 
-  async getPermissions(userId: number, deviceId = 0): Promise<TraccarPermission[]> {
+  async getPermissions(userId: number, deviceId = 0): Promise<ElevaticsPermission[]> {
     if (userId === 0 && deviceId === 0) {
       throw new Error('getPermissions requires a non-zero userId or deviceId');
     }
@@ -502,11 +503,11 @@ class TraccarAPI {
       deviceId: String(deviceId),
     });
 
-    const data = await this.request<TraccarPermission[]>(`/api/permissions?${params.toString()}`);
+    const data = await this.request<ElevaticsPermission[]>(`/api/permissions?${params.toString()}`);
     return Array.isArray(data) ? data : [];
   }
 
-  async getAllUserDevicePermissions(users: TraccarUser[]): Promise<TraccarPermission[]> {
+  async getAllUserDevicePermissions(users: ElevaticsUser[]): Promise<ElevaticsPermission[]> {
     const results = await Promise.all(
       users.map(async user => {
         try {
@@ -566,4 +567,4 @@ class TraccarAPI {
   }
 }
 
-export const traccarAPI = new TraccarAPI();
+export const elevaticsAPI = new ElevaticsAPI();

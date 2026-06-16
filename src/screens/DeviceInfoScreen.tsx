@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { usePrefsStore } from '../stores/prefsStore';
 import { formatSpeed } from '../utils/units';
@@ -28,15 +28,15 @@ export const DeviceInfoScreen: React.FC<DeviceInfoScreenProps> = ({ deviceId, on
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [position, setPosition] = useState<TraccarPosition | null>(null);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [position, setPosition] = useState<ElevaticsPosition | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [deviceData, positions] = await Promise.all([traccarAPI.getDevice(deviceId), traccarAPI.getPositions(deviceId)]);
+        const [deviceData, positions] = await Promise.all([elevaticsAPI.getDevice(deviceId), elevaticsAPI.getPositions(deviceId)]);
         setDevice(deviceData);
         if (positions.length > 0) {
           const latest = positions[0];

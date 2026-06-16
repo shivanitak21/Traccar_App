@@ -19,15 +19,15 @@ import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
-import { traccarAPI, TraccarDevice, TraccarPermission, TraccarUser } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPermission, ElevaticsUser } from '../api/elevatics';
 
 export const UserAccessScreen: React.FC = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [users, setUsers] = useState<TraccarUser[]>([]);
-  const [devices, setDevices] = useState<TraccarDevice[]>([]);
-  const [permissions, setPermissions] = useState<TraccarPermission[]>([]);
+  const [users, setUsers] = useState<ElevaticsUser[]>([]);
+  const [devices, setDevices] = useState<ElevaticsDevice[]>([]);
+  const [permissions, setPermissions] = useState<ElevaticsPermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,8 +38,8 @@ export const UserAccessScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [usersData, devicesData] = await Promise.all([traccarAPI.getUsers(), traccarAPI.getDevices()]);
-      const permissionsData = await traccarAPI.getAllUserDevicePermissions(usersData);
+      const [usersData, devicesData] = await Promise.all([elevaticsAPI.getUsers(), elevaticsAPI.getDevices()]);
+      const permissionsData = await elevaticsAPI.getAllUserDevicePermissions(usersData);
       setUsers(usersData); setDevices(devicesData); setPermissions(permissionsData);
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to load users'); }
     finally { setLoading(false); }
@@ -59,17 +59,17 @@ export const UserAccessScreen: React.FC = () => {
     return map;
   }, [permissions]);
 
-  const updateFlag = async (user: TraccarUser, key: keyof TraccarUser, value: boolean) => {
+  const updateFlag = async (user: ElevaticsUser, key: keyof ElevaticsUser, value: boolean) => {
     try {
-      const updated = await traccarAPI.updateUser(user.id, { ...user, [key]: value });
+      const updated = await elevaticsAPI.updateUser(user.id, { ...user, [key]: value });
       setUsers(prev => prev.map(u => (u.id === user.id ? updated : u)));
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to update user'); }
   };
 
-  const toggleDeviceAccess = async (user: TraccarUser, deviceId: number, enabled: boolean) => {
+  const toggleDeviceAccess = async (user: ElevaticsUser, deviceId: number, enabled: boolean) => {
     try {
-      if (enabled) { await traccarAPI.linkPermission(user.id, deviceId); setPermissions(prev => [...prev, { userId: user.id, deviceId }]); }
-      else { await traccarAPI.unlinkPermission(user.id, deviceId); setPermissions(prev => prev.filter(p => !(p.userId === user.id && p.deviceId === deviceId))); }
+      if (enabled) { await elevaticsAPI.linkPermission(user.id, deviceId); setPermissions(prev => [...prev, { userId: user.id, deviceId }]); }
+      else { await elevaticsAPI.unlinkPermission(user.id, deviceId); setPermissions(prev => prev.filter(p => !(p.userId === user.id && p.deviceId === deviceId))); }
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to update device access'); loadData(); }
   };
 
@@ -78,16 +78,16 @@ export const UserAccessScreen: React.FC = () => {
   const createUser = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) { Alert.alert('Validation', 'Name, email, and password are required'); return; }
     try {
-      await traccarAPI.createUser({ name: name.trim(), email: email.trim(), password: password.trim(), readonly: false, administrator: false, disabled: false });
+      await elevaticsAPI.createUser({ name: name.trim(), email: email.trim(), password: password.trim(), readonly: false, administrator: false, disabled: false });
       setModalVisible(false); loadData();
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to create user'); }
   };
 
-  const deleteUser = (user: TraccarUser) => {
+  const deleteUser = (user: ElevaticsUser) => {
     Alert.alert('Delete user', `Remove ${user.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await traccarAPI.deleteUser(user.id); loadData(); }
+        try { await elevaticsAPI.deleteUser(user.id); loadData(); }
         catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete user'); }
       }},
     ]);

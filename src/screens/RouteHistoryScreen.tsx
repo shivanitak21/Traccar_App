@@ -15,7 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Calendar, Clock, Navigation, MapPin, X, Filter, Eye } from 'lucide-react-native';
@@ -44,14 +44,14 @@ interface RouteSegment {
   fromTime: Date;
   toTime: Date;
   distance: number; // km
-  positions: TraccarPosition[];
+  positions: ElevaticsPosition[];
 }
 
 export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId, onClose }) => {
   const { colors, isDark } = useTheme();
   const { prefs } = usePrefsStore();
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [route, setRoute] = useState<TraccarPosition[]>([]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [route, setRoute] = useState<ElevaticsPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -66,7 +66,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const [showToTimePicker, setShowToTimePicker] = useState(false);
   const [showRouteOnMap, setShowRouteOnMap] = useState(false);
 
-  const calculateStats = (positions: TraccarPosition[]): RouteStats => {
+  const calculateStats = (positions: ElevaticsPosition[]): RouteStats => {
     if (positions.length === 0) {
       return {
         totalDistance: 0,
@@ -142,7 +142,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
-      const deviceData = await traccarAPI.getDevice(deviceId);
+      const deviceData = await elevaticsAPI.getDevice(deviceId);
       setDevice(deviceData);
 
       const to = toDate || new Date();
@@ -166,7 +166,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
       const fromISO = from.toISOString();
       const toISO = to.toISOString();
 
-      const routeData = await traccarAPI.getRoute(deviceId, fromISO, toISO);
+      const routeData = await elevaticsAPI.getRoute(deviceId, fromISO, toISO);
 
       if (routeData.length === 0) {
         setRoute([]);
@@ -301,7 +301,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     return `${mins}m`;
   };
 
-  const getRoutePolylines = useCallback((positions: TraccarPosition[]) => {
+  const getRoutePolylines = useCallback((positions: ElevaticsPosition[]) => {
     if (positions.length < 2) return [];
 
     const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number; opacity?: number }[] = [];
@@ -326,7 +326,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     return polylines;
   }, [colors]);
 
-  const getMapCenter = useCallback((positions: TraccarPosition[]) => {
+  const getMapCenter = useCallback((positions: ElevaticsPosition[]) => {
     if (positions.length === 0) return { latitude: 0, longitude: 0 };
     const centerIndex = Math.floor(positions.length / 2);
     return {

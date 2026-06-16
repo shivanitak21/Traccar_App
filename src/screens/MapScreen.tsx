@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView, MapLayerType } from '../components/WebMapView';
 import { MapPin, X, Layers } from 'lucide-react-native';
@@ -25,14 +25,14 @@ export const MapScreen: React.FC = () => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const themeBaseLayer = getThemeBaseMapLayer(isDark);
 
-  const [devices, setDevices] = useState<TraccarDevice[]>([]);
-  const [positions, setPositions] = useState<Map<number, TraccarPosition>>(new Map());
+  const [devices, setDevices] = useState<ElevaticsDevice[]>([]);
+  const [positions, setPositions] = useState<Map<number, ElevaticsPosition>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [mapLayer, setMapLayer] = useState<MapLayerType>(themeBaseLayer);
   const [showLayerSelector, setShowLayerSelector] = useState(false);
   const [deviceAddresses, setDeviceAddresses] = useState<Map<number, string>>(new Map());
-  const [positionTrails, setPositionTrails] = useState<Map<number, TraccarPosition[]>>(new Map());
+  const [positionTrails, setPositionTrails] = useState<Map<number, ElevaticsPosition[]>>(new Map());
 
   useEffect(() => {
     setMapLayer(prev => resolveMapLayer(prev, isDark));
@@ -41,11 +41,11 @@ export const MapScreen: React.FC = () => {
   const loadData = async () => {
     try {
       const [devicesData, positionsData] = await Promise.all([
-        traccarAPI.getDevices(),
-        traccarAPI.getPositions(),
+        elevaticsAPI.getDevices(),
+        elevaticsAPI.getPositions(),
       ]);
       setDevices(devicesData);
-      const posMap = new Map<number, TraccarPosition>();
+      const posMap = new Map<number, ElevaticsPosition>();
       const addressMap = new Map<number, string>();
       await Promise.all(
         positionsData.map(async (pos) => {
@@ -73,8 +73,8 @@ export const MapScreen: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    traccarWS.connect();
-    const handlePositionUpdate = (updatedPositions: TraccarPosition[]) => {
+    elevaticsWS.connect();
+    const handlePositionUpdate = (updatedPositions: ElevaticsPosition[]) => {
       setPositions(prev => {
         const posMap = new Map(prev);
         updatedPositions.forEach(pos => posMap.set(pos.deviceId, pos));
@@ -102,8 +102,8 @@ export const MapScreen: React.FC = () => {
         }),
       );
     };
-    traccarWS.on('positions', handlePositionUpdate);
-    return () => { traccarWS.off('positions', handlePositionUpdate); };
+    elevaticsWS.on('positions', handlePositionUpdate);
+    return () => { elevaticsWS.off('positions', handlePositionUpdate); };
   }, []);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export const MapScreen: React.FC = () => {
     const loadTrail = async () => {
       const to = new Date();
       const from = new Date(to.getTime() - 60 * 60 * 1000);
-      const route = await traccarAPI.getReportRoute(selectedDeviceId, from.toISOString(), to.toISOString()).catch(() => []);
+      const route = await elevaticsAPI.getReportRoute(selectedDeviceId, from.toISOString(), to.toISOString()).catch(() => []);
       if (route.length === 0) return;
 
       setPositionTrails(prev => {

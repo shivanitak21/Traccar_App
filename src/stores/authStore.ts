@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { traccarAPI, TraccarUser } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { sanitizeBrandText } from '../utils/brandText';
+import { elevaticsAPI, ElevaticsUser } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { storage } from '../utils/storage';
 import { API_CONFIG } from '../api/config';
 import { useFleetStore } from './fleetStore';
@@ -8,7 +9,7 @@ import { useCompanionStore } from './companionStore';
 import { queryClient } from '../api/queryClient';
 
 interface AuthState {
-  user: TraccarUser | null;
+  user: ElevaticsUser | null;
   serverUrl: string;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -19,7 +20,7 @@ interface AuthState {
   initialize: () => Promise<boolean>;
   login: (serverUrl: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  setUser: (user: TraccarUser) => void;
+  setUser: (user: ElevaticsUser) => void;
   clearError: () => void;
 }
 
@@ -47,25 +48,25 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
 
       const url = savedUrl ?? API_CONFIG.DEFAULT_BASE_URL;
-      const previousUrl = traccarAPI.getBaseUrl();
-      traccarAPI.setBaseUrl(url);
-      await traccarAPI.initialize();
+      const previousUrl = elevaticsAPI.getBaseUrl();
+      elevaticsAPI.setBaseUrl(url);
+      await elevaticsAPI.initialize();
 
       if (previousUrl !== url) {
-        traccarWS.disconnect();
+        elevaticsWS.disconnect();
       }
 
       if (savedCookie) {
-        traccarAPI.setSessionCookie(savedCookie);
+        elevaticsAPI.setSessionCookie(savedCookie);
       }
 
       let user = savedUser;
       try {
-        user = await traccarAPI.getSession();
+        user = await elevaticsAPI.getSession();
         await storage.saveUser(user);
       } catch {
         await storage.clearSession();
-        traccarAPI.clearAuth();
+        elevaticsAPI.clearAuth();
         set({
           user: null,
           serverUrl: url,
@@ -95,21 +96,21 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const cleanUrl = serverUrl.replace(/\/$/, '');
-      traccarAPI.setBaseUrl(cleanUrl);
+      elevaticsAPI.setBaseUrl(cleanUrl);
       await storage.saveServerUrl(cleanUrl);
 
-      const user = await traccarAPI.login(email, password);
+      const user = await elevaticsAPI.login(email, password);
       set({ user, serverUrl: cleanUrl, isAuthenticated: true, isLoading: false, hasHydrated: true });
     } catch (err: any) {
-      set({ error: err.message ?? 'Login failed', isLoading: false });
+      set({ error: sanitizeBrandText(err.message ?? 'Login failed'), isLoading: false });
       throw err;
     }
   },
 
   logout: async () => {
-    traccarWS.disconnect();
+    elevaticsWS.disconnect();
     useCompanionStore.getState().close();
-    traccarAPI.clearAuth();
+    elevaticsAPI.clearAuth();
     useFleetStore.getState().reset();
     queryClient.clear();
 
@@ -122,7 +123,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
 
     try {
-      await traccarAPI.logout();
+      await elevaticsAPI.logout();
     } catch {}
 
     const savedUrl = await storage.getServerUrl();

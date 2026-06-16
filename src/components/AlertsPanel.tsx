@@ -24,8 +24,8 @@ import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
 import { SegmentedControl } from './ui/SegmentedControl';
-import { traccarAPI, TraccarEvent } from '../api/traccar';
-import { traccarWS } from '../api/websocket';
+import { elevaticsAPI, ElevaticsEvent } from '../api/elevatics';
+import { elevaticsWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
 
 function formatTimeAgo(dateStr: string): string {
@@ -47,7 +47,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'connection', label: 'Connection' },
 ];
 
-function filterEvents(events: TraccarEvent[], tab: FilterTab): TraccarEvent[] {
+function filterEvents(events: ElevaticsEvent[], tab: FilterTab): ElevaticsEvent[] {
   switch (tab) {
     case 'alerts':
       return events.filter(e => ['alarm', 'deviceOverspeed', 'maintenance'].includes(e.type));
@@ -69,7 +69,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
   const { recentEvents, devices, addEvents } = useFleetStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [events, setEvents] = useState<TraccarEvent[]>([]);
+  const [events, setEvents] = useState<ElevaticsEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
@@ -97,11 +97,11 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
     try {
       const to = new Date().toISOString();
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const data = await traccarAPI.getEvents(undefined, from, to);
+      const data = await elevaticsAPI.getEvents(undefined, from, to);
       setEvents(data || []);
       if (data?.length) addEvents(data);
     } catch {
-      setEvents(recentEvents as TraccarEvent[]);
+      setEvents(recentEvents as ElevaticsEvent[]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,16 +114,16 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
     setLoading(true);
     loadEvents();
 
-    const handleWsEvents = (wsEvents: TraccarEvent[]) => {
+    const handleWsEvents = (wsEvents: ElevaticsEvent[]) => {
       setEvents(prev => [...wsEvents, ...prev].slice(0, 200));
       addEvents(wsEvents);
     };
-    traccarWS.on('events', handleWsEvents);
-    return () => traccarWS.off('events', handleWsEvents);
+    elevaticsWS.on('events', handleWsEvents);
+    return () => elevaticsWS.off('events', handleWsEvents);
   }, [visible, loadEvents, addEvents]);
 
   const displayEvents = filterEvents(
-    events.length > 0 ? events : (recentEvents as TraccarEvent[]),
+    events.length > 0 ? events : (recentEvents as ElevaticsEvent[]),
     activeFilter,
   );
 
@@ -211,7 +211,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ visible, onClose }) =>
 };
 
 const EventRow: React.FC<{
-  event: TraccarEvent;
+  event: ElevaticsEvent;
   deviceName: string;
   getEventMeta: (type: string) => { label: string; icon: any; color: string };
   colors: ReturnType<typeof useTheme>['colors'];
@@ -374,7 +374,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
 });
 
-export function getUnreadAlertCount(events: TraccarEvent[]): number {
+export function getUnreadAlertCount(events: ElevaticsEvent[]): number {
   return events.filter(e =>
     ['alarm', 'deviceOverspeed', 'geofenceExit', 'deviceOffline'].includes(e.type),
   ).length;

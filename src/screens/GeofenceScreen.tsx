@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarGeofence } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsGeofence } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { MapPinned, Plus, Trash2, Edit3, X, Save, Square, RectangleHorizontal } from 'lucide-react-native';
@@ -29,13 +29,13 @@ type DrawingMode = 'none' | 'polygon' | 'rectangle';
 export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClose }) => {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [geofences, setGeofences] = useState<TraccarGeofence[]>([]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [geofences, setGeofences] = useState<ElevaticsGeofence[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>('none');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingGeofence, setEditingGeofence] = useState<TraccarGeofence | null>(null);
+  const [editingGeofence, setEditingGeofence] = useState<ElevaticsGeofence | null>(null);
   const [geofenceName, setGeofenceName] = useState('');
   const [geofenceDescription, setGeofenceDescription] = useState('');
   const [drawnArea, setDrawnArea] = useState<string | null>(null);
@@ -44,9 +44,9 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
   const loadData = async () => {
     try {
       const [deviceData, geofencesData, positionsData] = await Promise.all([
-        traccarAPI.getDevice(deviceId),
-        traccarAPI.getGeofences(),
-        traccarAPI.getPositions(deviceId),
+        elevaticsAPI.getDevice(deviceId),
+        elevaticsAPI.getGeofences(),
+        elevaticsAPI.getPositions(deviceId),
       ]);
 
       setDevice(deviceData);
@@ -87,7 +87,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     setShowEditModal(false);
   };
 
-  const zoomToGeofence = (geofence: TraccarGeofence) => {
+  const zoomToGeofence = (geofence: ElevaticsGeofence) => {
     try {
       console.log('Zooming to geofence:', geofence.name, geofence.area);
       
@@ -128,7 +128,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     }
   };
 
-  const handleEditGeofence = (geofence: TraccarGeofence) => {
+  const handleEditGeofence = (geofence: ElevaticsGeofence) => {
     setEditingGeofence(geofence);
     setGeofenceName(geofence.name);
     setGeofenceDescription(geofence.description || '');
@@ -141,7 +141,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     zoomToGeofence(geofence);
   };
 
-  const handleDeleteGeofence = async (geofence: TraccarGeofence) => {
+  const handleDeleteGeofence = async (geofence: ElevaticsGeofence) => {
     Alert.alert(
       'Delete Geofence',
       `Are you sure you want to delete "${geofence.name}"?`,
@@ -152,7 +152,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
           style: 'destructive',
           onPress: async () => {
             try {
-              await traccarAPI.deleteGeofence(geofence.id);
+              await elevaticsAPI.deleteGeofence(geofence.id);
               await loadData();
               Alert.alert('Success', 'Geofence deleted successfully');
             } catch (error) {
@@ -180,14 +180,14 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
       const area = drawnArea || editingGeofence?.area || '';
       
       if (editingGeofence) {
-        await traccarAPI.updateGeofence(editingGeofence.id, {
+        await elevaticsAPI.updateGeofence(editingGeofence.id, {
           name: geofenceName,
           description: geofenceDescription,
           area: area,
         });
         Alert.alert('Success', 'Geofence updated successfully');
       } else {
-        await traccarAPI.createGeofence({
+        await elevaticsAPI.createGeofence({
           name: geofenceName,
           description: geofenceDescription,
           area: area,

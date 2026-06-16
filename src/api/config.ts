@@ -1,4 +1,4 @@
-// Production Traccar API configuration
+// Production Elevatics IoT API configuration
 export const API_CONFIG = {
   DEFAULT_BASE_URL: 'https://elevaticsiot.com',
   API_PATH: '/api',

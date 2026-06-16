@@ -37,7 +37,7 @@ async function reverseGeocodeUncached(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
       {
         headers: {
-          'User-Agent': 'TraccarApp/1.0',
+          'User-Agent': 'ElevaticsIoT/1.0',
         },
       },
     );

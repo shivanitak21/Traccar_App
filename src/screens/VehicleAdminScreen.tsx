@@ -18,16 +18,16 @@ import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/Button';
-import { traccarAPI, TraccarDevice } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice } from '../api/elevatics';
 
 export const VehicleAdminScreen: React.FC = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [devices, setDevices] = useState<TraccarDevice[]>([]);
+  const [devices, setDevices] = useState<ElevaticsDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editing, setEditing] = useState<TraccarDevice | null>(null);
+  const [editing, setEditing] = useState<ElevaticsDevice | null>(null);
   const [name, setName] = useState('');
   const [uniqueId, setUniqueId] = useState('');
   const [model, setModel] = useState('');
@@ -37,7 +37,7 @@ export const VehicleAdminScreen: React.FC = () => {
   const loadDevices = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await traccarAPI.getDevices();
+      const data = await elevaticsAPI.getDevices();
       setDevices(data);
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to load vehicles'); }
     finally { setLoading(false); }
@@ -50,7 +50,7 @@ export const VehicleAdminScreen: React.FC = () => {
     setModalVisible(true);
   };
 
-  const openEdit = (device: TraccarDevice) => {
+  const openEdit = (device: ElevaticsDevice) => {
     setEditing(device); setName(device.name); setUniqueId(device.uniqueId);
     setModel(device.model || ''); setPhone(device.phone || ''); setCategory(device.category || '');
     setModalVisible(true);
@@ -59,18 +59,18 @@ export const VehicleAdminScreen: React.FC = () => {
   const saveDevice = async () => {
     if (!name.trim() || !uniqueId.trim()) { Alert.alert('Validation', 'Name and unique ID are required'); return; }
     try {
-      const payload: Partial<TraccarDevice> = { name: name.trim(), uniqueId: uniqueId.trim(), model: model.trim() || undefined, phone: phone.trim() || undefined, category: category.trim() || undefined };
-      if (editing) { await traccarAPI.updateDevice(editing.id, { ...editing, ...payload }); }
-      else { await traccarAPI.createDevice({ ...payload, disabled: false }); }
+      const payload: Partial<ElevaticsDevice> = { name: name.trim(), uniqueId: uniqueId.trim(), model: model.trim() || undefined, phone: phone.trim() || undefined, category: category.trim() || undefined };
+      if (editing) { await elevaticsAPI.updateDevice(editing.id, { ...editing, ...payload }); }
+      else { await elevaticsAPI.createDevice({ ...payload, disabled: false }); }
       setModalVisible(false); loadDevices();
     } catch (err: any) { Alert.alert('Error', err?.message || 'Failed to save vehicle'); }
   };
 
-  const deleteDevice = (device: TraccarDevice) => {
+  const deleteDevice = (device: ElevaticsDevice) => {
     Alert.alert('Delete vehicle', `Remove ${device.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await traccarAPI.deleteDevice(device.id); loadDevices(); }
+        try { await elevaticsAPI.deleteDevice(device.id); loadDevices(); }
         catch (err: any) { Alert.alert('Error', err?.message || 'Failed to delete vehicle'); }
       }},
     ]);

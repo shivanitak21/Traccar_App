@@ -1,11 +1,11 @@
-import { traccarAPI } from './traccar';
+import { elevaticsAPI } from './elevatics';
 import { storage } from '../utils/storage';
 import { WS_RECONNECT_DELAY, WS_MAX_RECONNECT_DELAY } from './config';
 
 type WebSocketEvent = 'connected' | 'positions' | 'devices' | 'events';
 type WebSocketListener = (data: any) => void;
 
-class TraccarWebSocket {
+class ElevaticsWebSocket {
   private ws: WebSocket | null = null;
   private listeners: Map<string, WebSocketListener[]> = new Map();
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -24,7 +24,7 @@ class TraccarWebSocket {
     this.shouldReconnect = true;
 
     try {
-      const url = traccarAPI.getWebSocketUrl();
+      const url = elevaticsAPI.getWebSocketUrl();
       // Append session cookie as query param for WS auth if available
       const cookie = await storage.getSessionCookie();
       const wsUrl = cookie
@@ -134,4 +134,4 @@ class TraccarWebSocket {
   }
 }
 
-export const traccarWS = new TraccarWebSocket();
+export const elevaticsWS = new ElevaticsWebSocket();

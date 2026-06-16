@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { traccarAPI } from '../api/traccar';
+import { elevaticsAPI } from '../api/elevatics';
 import { storage } from '../utils/storage';
 import type { DistanceUnit, SpeedUnit, FuelUnit } from '../utils/units';
 
@@ -81,7 +81,7 @@ export const usePrefsStore = create<PrefsState>((set, get) => ({
       const saved = await storage.getPreferences();
       let serverConfig: any = null;
       try {
-        serverConfig = await traccarAPI.getServer();
+        serverConfig = await elevaticsAPI.getServer();
       } catch {
         // offline or no permission
       }
@@ -107,7 +107,7 @@ export const usePrefsStore = create<PrefsState>((set, get) => ({
     if (serverConfig) {
       try {
         const payload = toServer(prefs, serverConfig);
-        const updated = await traccarAPI.updateServer(payload);
+        const updated = await elevaticsAPI.updateServer(payload);
         set({ serverConfig: updated });
       } catch (err) {
         console.error('Failed to sync prefs to server:', err);

@@ -44,7 +44,7 @@ import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useAuthStore } from '../stores/authStore';
 import { usePrefsStore } from '../stores/prefsStore';
-import { traccarWS } from '../api/websocket';
+import { elevaticsWS } from '../api/websocket';
 import type { ThemeMode } from '../theme/themes';
 
 interface SettingsScreenProps {
@@ -57,7 +57,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const { prefs, initialize: initPrefs, setPref, savePrefs } = usePrefsStore();
   const { colors, isDark, themeMode, setThemeMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [wsConnected, setWsConnected] = useState(traccarWS.isConnected);
+  const [wsConnected, setWsConnected] = useState(elevaticsWS.isConnected);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [savingPrefs, setSavingPrefs] = useState(false);
 
@@ -65,8 +65,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   useEffect(() => {
     const handleConnect = (connected: boolean) => setWsConnected(connected);
-    traccarWS.on('connected', handleConnect);
-    return () => traccarWS.off('connected', handleConnect);
+    elevaticsWS.on('connected', handleConnect);
+    return () => elevaticsWS.off('connected', handleConnect);
   }, []);
 
   const performLogout = () => { void logout(); onLogout(); };
@@ -113,8 +113,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   const handleReconnectWS = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    traccarWS.disconnect();
-    setTimeout(() => traccarWS.connect(), 500);
+    elevaticsWS.disconnect();
+    setTimeout(() => elevaticsWS.connect(), 500);
   };
 
   const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'U';

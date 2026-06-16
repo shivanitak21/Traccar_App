@@ -34,7 +34,8 @@ import { radius } from '../theme/radius';
 import { GlassCard } from '../components/GlassCard';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { traccarAPI, TraccarTrip, TraccarSummary, TraccarStop, TraccarEvent, TraccarPosition } from '../api/traccar';
+import { sanitizeBrandText } from '../utils/brandText';
+import { elevaticsAPI, ElevaticsTrip, ElevaticsSummary, ElevaticsStop, ElevaticsEvent, ElevaticsPosition } from '../api/elevatics';
 import { useFleetStore } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { WebMapView } from '../components/WebMapView';
@@ -127,11 +128,11 @@ export const ReportsScreen: React.FC = () => {
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [dateRange, setDateRange] = useState('7d');
   const [loading, setLoading] = useState(false);
-  const [trips, setTrips] = useState<TraccarTrip[]>([]);
-  const [summary, setSummary] = useState<TraccarSummary[]>([]);
-  const [stops, setStops] = useState<TraccarStop[]>([]);
-  const [events, setEvents] = useState<TraccarEvent[]>([]);
-  const [routePositions, setRoutePositions] = useState<TraccarPosition[]>([]);
+  const [trips, setTrips] = useState<ElevaticsTrip[]>([]);
+  const [summary, setSummary] = useState<ElevaticsSummary[]>([]);
+  const [stops, setStops] = useState<ElevaticsStop[]>([]);
+  const [events, setEvents] = useState<ElevaticsEvent[]>([]);
+  const [routePositions, setRoutePositions] = useState<ElevaticsPosition[]>([]);
   const [page, setPage] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,8 +140,8 @@ export const ReportsScreen: React.FC = () => {
   useEffect(() => {
     const loadDevices = async () => {
       try {
-        await traccarAPI.initialize();
-        const data = await traccarAPI.getDevices();
+        await elevaticsAPI.initialize();
+        const data = await elevaticsAPI.getDevices();
         setDevices(data);
         if (data.length > 0) {
           setSelectedDeviceId(prev => prev ?? data[0].id);
@@ -174,12 +175,12 @@ export const ReportsScreen: React.FC = () => {
     setPage(0);
 
     try {
-      await traccarAPI.initialize();
+      await elevaticsAPI.initialize();
       const { from, to } = getDateRange(dateRange);
 
       switch (reportType) {
         case 'route': {
-          const data = await traccarAPI.getReportRoute(selectedDeviceId, from, to);
+          const data = await elevaticsAPI.getReportRoute(selectedDeviceId, from, to);
           const sorted = (Array.isArray(data) ? data : []).sort(
             (a, b) => new Date(a.fixTime).getTime() - new Date(b.fixTime).getTime()
           );
@@ -187,29 +188,29 @@ export const ReportsScreen: React.FC = () => {
           break;
         }
         case 'trips': {
-          const data = await traccarAPI.getReportTrips(selectedDeviceId, from, to);
+          const data = await elevaticsAPI.getReportTrips(selectedDeviceId, from, to);
           setTrips(Array.isArray(data) ? data : []);
           break;
         }
         case 'summary': {
-          const data = await traccarAPI.getReportSummary(selectedDeviceId, from, to);
+          const data = await elevaticsAPI.getReportSummary(selectedDeviceId, from, to);
           setSummary(Array.isArray(data) ? data : []);
           break;
         }
         case 'stops': {
-          const data = await traccarAPI.getReportStops(selectedDeviceId, from, to);
+          const data = await elevaticsAPI.getReportStops(selectedDeviceId, from, to);
           setStops(Array.isArray(data) ? data : []);
           break;
         }
         case 'events': {
-          const data = await traccarAPI.getReportEvents(selectedDeviceId, from, to);
+          const data = await elevaticsAPI.getReportEvents(selectedDeviceId, from, to);
           setEvents(Array.isArray(data) ? data : []);
           break;
         }
       }
       setHasLoaded(true);
     } catch (err: any) {
-      const msg = err?.message || 'Failed to generate report';
+      const msg = sanitizeBrandText(err?.message || 'Failed to generate report');
       console.error('Report error:', err);
       setError(msg);
       setHasLoaded(true);
@@ -790,7 +791,7 @@ export const ReportsScreen: React.FC = () => {
 
 // ── Report sub-components ─────────────────────────────────────────────────────
 
-const TripsSummaryCard: React.FC<{ trips: TraccarTrip[]; prefs: ReturnType<typeof usePrefsStore.getState>['prefs'] }> = ({ trips, prefs }) => {
+const TripsSummaryCard: React.FC<{ trips: ElevaticsTrip[]; prefs: ReturnType<typeof usePrefsStore.getState>['prefs'] }> = ({ trips, prefs }) => {
   const { colors } = useTheme();
   const totalDist = trips.reduce((s, t) => s + (t.distance || 0), 0);
   const totalTime = trips.reduce((s, t) => s + normalizeDurationSec(t.duration), 0);
@@ -876,7 +877,7 @@ const LoadMoreButton: React.FC<{ label: string; onPress: () => void }> = ({ labe
 };
 
 const RouteOverview: React.FC<{
-  positions: TraccarPosition[];
+  positions: ElevaticsPosition[];
   prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
 }> = ({ positions, prefs }) => {
   const { colors } = useTheme();
@@ -927,7 +928,7 @@ const RouteOverview: React.FC<{
 };
 
 const RouteHighlights: React.FC<{
-  positions: TraccarPosition[];
+  positions: ElevaticsPosition[];
   prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
 }> = ({ positions, prefs }) => {
   const { colors } = useTheme();
@@ -973,7 +974,7 @@ const RouteHighlights: React.FC<{
   );
 };
 
-const StopsOverview: React.FC<{ stops: TraccarStop[] }> = ({ stops }) => {
+const StopsOverview: React.FC<{ stops: ElevaticsStop[] }> = ({ stops }) => {
   const { colors } = useTheme();
   const totalDuration = stops.reduce((s, stop) => s + normalizeDurationSec(stop.duration), 0);
   const longest = stops.reduce((best, stop) =>
@@ -1010,7 +1011,7 @@ const StopsOverview: React.FC<{ stops: TraccarStop[] }> = ({ stops }) => {
 };
 
 const EventsOverview: React.FC<{
-  events: TraccarEvent[];
+  events: ElevaticsEvent[];
   breakdown: [string, number][];
 }> = ({ events, breakdown }) => {
   const { colors } = useTheme();
@@ -1048,7 +1049,7 @@ const EventsOverview: React.FC<{
   );
 };
 
-const EventRow: React.FC<{ event: TraccarEvent }> = ({ event }) => {
+const EventRow: React.FC<{ event: ElevaticsEvent }> = ({ event }) => {
   const { colors } = useTheme();
   const variant = getEventVariant(event.type);
 
@@ -1069,7 +1070,7 @@ const EventRow: React.FC<{ event: TraccarEvent }> = ({ event }) => {
 };
 
 const SummaryVisual: React.FC<{
-  data: TraccarSummary;
+  data: ElevaticsSummary;
   prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
 }> = ({ data, prefs }) => {
   const { colors } = useTheme();
@@ -1126,7 +1127,7 @@ const SummaryVisual: React.FC<{
   );
 };
 
-const TripRow: React.FC<{ trip: TraccarTrip; index: number }> = ({ trip, index }) => {
+const TripRow: React.FC<{ trip: ElevaticsTrip; index: number }> = ({ trip, index }) => {
   const { colors } = useTheme();
   const { prefs } = usePrefsStore();
 
@@ -1263,7 +1264,7 @@ const TripRow: React.FC<{ trip: TraccarTrip; index: number }> = ({ trip, index }
   );
 };
 
-const StopRow: React.FC<{ stop: TraccarStop }> = ({ stop }) => {
+const StopRow: React.FC<{ stop: ElevaticsStop }> = ({ stop }) => {
   const { colors } = useTheme();
 
   const stStyles = useMemo(() => StyleSheet.create({

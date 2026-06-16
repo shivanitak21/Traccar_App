@@ -2,12 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeServerUrl } from './serverUrl';
 
 const KEYS = {
-  SESSION: '@traccar_session',
-  SESSION_COOKIE: '@traccar_cookie',
-  USER: '@traccar_user',
-  SERVER_URL: '@traccar_server',
-  MAP_STYLE: '@traccar_map_style',
-  PREFERENCES: '@traccar_prefs',
+  SESSION: '@elevatics_session',
+  SESSION_COOKIE: '@elevatics_cookie',
+  USER: '@elevatics_user',
+  SERVER_URL: '@elevatics_server',
+  MAP_STYLE: '@elevatics_map_style',
+  PREFERENCES: '@elevatics_prefs',
 } as const;
 
 export const storage = {

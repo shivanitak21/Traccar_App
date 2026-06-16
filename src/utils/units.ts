@@ -9,7 +9,7 @@ const KNOTS_TO_MPH = 1.15078;
 
 export function normalizeDurationSec(duration: number): number {
   if (!duration || duration <= 0) return 0;
-  // Traccar may return ms or seconds depending on server version
+  // Elevatics IoT may return ms or seconds depending on server version
   return duration > 86400 ? duration / 1000 : duration;
 }
 

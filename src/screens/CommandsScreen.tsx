@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { Radio, Power, Lock, Unlock, AlertTriangle, Navigation, Volume2, X } from 'lucide-react-native';
 
@@ -23,7 +23,7 @@ interface CommandsScreenProps {
 export const CommandsScreen: React.FC<CommandsScreenProps> = ({ deviceId, onClose }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
@@ -38,7 +38,7 @@ export const CommandsScreen: React.FC<CommandsScreenProps> = ({ deviceId, onClos
   ], [colors]);
 
   useEffect(() => {
-    traccarAPI.getDevice(deviceId).then(setDevice).catch(() => Alert.alert('Error', 'Failed to load device information')).finally(() => setLoading(false));
+    elevaticsAPI.getDevice(deviceId).then(setDevice).catch(() => Alert.alert('Error', 'Failed to load device information')).finally(() => setLoading(false));
   }, [deviceId]);
 
   const handleSendCommand = (command: typeof commands[0]) => {
@@ -47,7 +47,7 @@ export const CommandsScreen: React.FC<CommandsScreenProps> = ({ deviceId, onClos
       { text: 'Cancel', style: 'cancel' },
       { text: 'Send', onPress: async () => {
         setSending(true);
-        try { await traccarAPI.sendCommand(deviceId, command.type, {}); Alert.alert('Success', `${command.name} command sent successfully`); }
+        try { await elevaticsAPI.sendCommand(deviceId, command.type, {}); Alert.alert('Success', `${command.name} command sent successfully`); }
         catch { Alert.alert('Error', 'Failed to send command. Please try again.'); }
         finally { setSending(false); }
       }},

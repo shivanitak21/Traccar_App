@@ -15,7 +15,7 @@ import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Play, Pause, SkipBack, SkipForward, X, Calendar, Filter, Clock } from 'lucide-react-native';
@@ -35,8 +35,8 @@ type TimeFilter = '24h' | '7d' | '30d' | 'custom';
 export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClose }) => {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [route, setRoute] = useState<TraccarPosition[]>([]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [route, setRoute] = useState<ElevaticsPosition[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,7 +96,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
-      const deviceData = await traccarAPI.getDevice(deviceId);
+      const deviceData = await elevaticsAPI.getDevice(deviceId);
       setDevice(deviceData);
 
       const to = toDate || new Date();
@@ -121,7 +121,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
       const fromISO = from.toISOString();
       const toISO = to.toISOString();
 
-      const routeData = await traccarAPI.getReportRoute(deviceId, fromISO, toISO);
+      const routeData = await elevaticsAPI.getReportRoute(deviceId, fromISO, toISO);
 
       if (routeData.length === 0) {
         Alert.alert('No Data', `No route data found for the selected time period`);

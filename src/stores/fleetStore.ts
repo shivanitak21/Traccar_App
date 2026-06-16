@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { TraccarDevice, TraccarPosition, TraccarEvent } from '../api/traccar';
+import { ElevaticsDevice, ElevaticsPosition, ElevaticsEvent } from '../api/elevatics';
 import { resolveAddressesForPositions } from '../utils/address';
 
 export type DeviceStatus = 'online' | 'offline' | 'unknown';
 
-export interface DeviceWithPosition extends TraccarDevice {
-  position?: TraccarPosition;
+export interface DeviceWithPosition extends ElevaticsDevice {
+  position?: ElevaticsPosition;
   address?: string;
   computedStatus: DeviceStatus;
   speedKmh: number;
@@ -15,17 +15,17 @@ export interface DeviceWithPosition extends TraccarDevice {
 
 interface FleetState {
   devices: DeviceWithPosition[];
-  positions: Map<number, TraccarPosition>;
-  recentEvents: TraccarEvent[];
+  positions: Map<number, ElevaticsPosition>;
+  recentEvents: ElevaticsEvent[];
   selectedDeviceId: number | null;
   filter: 'all' | 'online' | 'offline' | 'moving' | 'idle';
   wsConnected: boolean;
 
   // Actions
-  setDevices: (devices: TraccarDevice[]) => void;
-  updateDevices: (updated: TraccarDevice[]) => void;
-  updatePositions: (positions: TraccarPosition[]) => void;
-  addEvents: (events: TraccarEvent[]) => void;
+  setDevices: (devices: ElevaticsDevice[]) => void;
+  updateDevices: (updated: ElevaticsDevice[]) => void;
+  updatePositions: (positions: ElevaticsPosition[]) => void;
+  addEvents: (events: ElevaticsEvent[]) => void;
   setSelectedDevice: (id: number | null) => void;
   setFilter: (filter: FleetState['filter']) => void;
   setWsConnected: (connected: boolean) => void;
@@ -43,7 +43,7 @@ interface FleetState {
   };
 }
 
-function computeDeviceStatus(device: TraccarDevice, position?: TraccarPosition): DeviceWithPosition {
+function computeDeviceStatus(device: ElevaticsDevice, position?: ElevaticsPosition): DeviceWithPosition {
   const speedKnots = position?.speed ?? 0;
   const speedKmh = Math.round(speedKnots * 1.852);
   const isMoving = speedKmh >= 1;
