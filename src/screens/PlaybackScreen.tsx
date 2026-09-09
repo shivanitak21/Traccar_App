@@ -62,11 +62,11 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
         latitude: p.latitude,
         longitude: p.longitude,
       })),
-      color: '#22c55e',
+      color: colors.blue,
       width: 6,
       opacity: 1,
     }];
-  }, [route, currentIndex]);
+  }, [route, currentIndex, colors.blue]);
 
   // Calculate current position and markers - MUST be before early returns
   const currentPosition = useMemo(() => {

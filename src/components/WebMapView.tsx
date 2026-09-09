@@ -194,6 +194,11 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     .geofence-label::before {
       display: none !important;
     }
+    .custom-marker-icon {
+      background: transparent !important;
+      border: none !important;
+      overflow: visible !important;
+    }
     .pulse-marker {
       width: 30px;
       height: 30px;
@@ -203,34 +208,41 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       animation: pulse 2s infinite;
     }
     .device-marker {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #10b981;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.85);
+      width: 26px;
+      height: 50px;
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
+      transform-origin: 50% 50%;
     }
     .device-marker svg {
-      width: 18px;
-      height: 18px;
-      fill: #ffffff;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+      width: 22px;
+      height: 44px;
+      overflow: visible;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
     }
-    .device-marker.online {
-      background: #10b981;
-      box-shadow: 0 0 14px rgba(16, 185, 129, 0.9);
+    .device-marker .car-body {
+      fill: #22c55e;
     }
-    .device-marker.offline {
-      background: #64748b;
-      box-shadow: 0 0 10px rgba(100, 116, 139, 0.6);
+    .device-marker.online .car-body,
+    .device-marker.moving .car-body {
+      fill: #22c55e;
     }
-    .device-marker.moving {
-      background: #3b82f6;
-      box-shadow: 0 0 14px rgba(59, 130, 246, 0.9);
+    .device-marker.offline .car-body {
+      fill: #ef4444;
+    }
+    .pin-marker {
+      width: 28px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin-marker svg {
+      width: 24px;
+      height: 36px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
     }
     @keyframes pulse {
       0%, 100% {
@@ -261,25 +273,60 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     let playbackTrailOutline = null;
     let playbackInitialized = false;
 
+    function isVehicleMarker(marker) {
+      return !!(marker && (marker.status || marker.deviceName || typeof marker.course === 'number'));
+    }
+
+    function vehicleStatusClass(marker) {
+      if (marker.status === 'online') return 'online';
+      if (marker.status === 'moving') return 'moving';
+      return 'offline';
+    }
+
+    function carSvg() {
+      return '<svg viewBox="0 0 36 72" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect class="car-body" x="4" y="2" width="28" height="68" rx="8" fill="#22c55e" stroke="#ffffff" stroke-width="2"/>' +
+        '<path fill="#0f172a" opacity="0.55" d="M10 16h16l3 13H7z"/>' +
+        '<path fill="#0f172a" opacity="0.4" d="M7 46h22l-3 13H10z"/>' +
+        '</svg>';
+    }
+
+    function pinSvg(color) {
+      const fill = color || '#0A84FF';
+      return '<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">' +
+        '<path fill="' + fill + '" stroke="#ffffff" stroke-width="1.6" d="M12 1.4C6.7 1.4 2.4 5.7 2.4 11c0 7.2 9.6 22.2 9.6 22.2S21.6 18.2 21.6 11C21.6 5.7 17.3 1.4 12 1.4z"/>' +
+        '<circle cx="12" cy="11" r="4.1" fill="#ffffff"/>' +
+        '</svg>';
+    }
+
     function buildMarkerIcon(marker) {
-      const statusClass = marker.status === 'online' ? 'online'
-        : marker.status === 'moving' ? 'moving'
-        : 'offline';
+      if (!isVehicleMarker(marker)) {
+        return L.divIcon({
+          className: 'custom-marker-icon',
+          iconSize: [28, 40],
+          iconAnchor: [14, 38],
+          popupAnchor: [0, -36],
+          html: '<div class="pin-marker">' + pinSvg(marker.color) + '</div>'
+        });
+      }
+
+      const statusClass = vehicleStatusClass(marker);
       const heading = marker.course || 0;
-      const navSvg = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5L19.5 20.5L12 16.5L4.5 20.5Z"/></svg>';
       return L.divIcon({
         className: 'custom-marker-icon',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18],
-        html: '<div class="device-marker ' + statusClass + '" style="transform:rotate(' + heading + 'deg);">' + navSvg + '</div>'
+        iconSize: [26, 50],
+        iconAnchor: [13, 25],
+        popupAnchor: [0, -22],
+        html: '<div class="device-marker ' + statusClass + '" style="transform:rotate(' + heading + 'deg);">' + carSvg() + '</div>'
       });
     }
 
-    function updateMarkerRotation(markerLayer, course) {
+    function updateMarkerAppearance(markerLayer, marker) {
       if (!markerLayer || !markerLayer._icon) return;
       const el = markerLayer._icon.querySelector('.device-marker');
-      if (el) el.style.transform = 'rotate(' + (course || 0) + 'deg)';
+      if (!el) return;
+      el.style.transform = 'rotate(' + (marker.course || 0) + 'deg)';
+      el.className = 'device-marker ' + vehicleStatusClass(marker);
     }
 
     function syncMapLayer(layerType) {
@@ -306,7 +353,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           }).addTo(map);
         } else {
           playbackMarker.setLatLng([marker.latitude, marker.longitude]);
-          updateMarkerRotation(playbackMarker, marker.course);
+          updateMarkerAppearance(playbackMarker, marker);
         }
       }
 
@@ -324,7 +371,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
             lineJoin: 'round',
           }).addTo(map);
           playbackTrail = L.polyline(coords, {
-            color: trailPoly.color || '#22c55e',
+            color: trailPoly.color || '#0A84FF',
             weight: weight,
             opacity: opacity,
             lineCap: 'round',
@@ -333,6 +380,11 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         } else {
           playbackTrailOutline.setLatLngs(coords);
           playbackTrail.setLatLngs(coords);
+          playbackTrail.setStyle({
+            color: trailPoly.color || '#0A84FF',
+            weight: weight,
+            opacity: opacity,
+          });
         }
       }
 
@@ -526,11 +578,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
             return;
           }
           processedIds.add(marker.id);
-          
-          const statusClass = marker.status === 'online' ? 'online'
-            : marker.status === 'moving' ? 'moving'
-            : 'offline';
-          const heading = marker.course || 0;
+
           const icon = buildMarkerIcon(marker);
 
           const m = L.marker([marker.latitude, marker.longitude], { icon })
