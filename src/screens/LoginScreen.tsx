@@ -16,13 +16,14 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { Eye, EyeOff, Lock, Mail, Server, ChevronRight } from 'lucide-react-native';
+import { Lock, Mail, Server, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
 import { shadows } from '../theme/shadows';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
+import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../stores/authStore';
 import { API_CONFIG } from '../api/config';
 import { storage } from '../utils/storage';
@@ -39,7 +40,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [serverUrl, setServerUrl] = useState<string>(API_CONFIG.DEFAULT_BASE_URL);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
 
   const emailRef = useRef<TextInput>(null);
@@ -95,98 +95,73 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Text style={styles.formTitle}>Sign in</Text>
             <Text style={styles.formSubtitle}>Connect to your fleet</Text>
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Server</Text>
-              <View style={[
-                styles.inputWrapper,
-                activeField === 'server' && styles.inputActive,
-              ]}>
-                <Server
-                  size={18}
-                  color={activeField === 'server' ? colors.text.primary : colors.text.tertiary}
-                  strokeWidth={1.8}
-                />
-                <TextInput
-                  style={styles.input}
-                  value={serverUrl}
-                  onChangeText={setServerUrl}
-                  onFocus={() => setActiveField('server')}
-                  onBlur={() => setActiveField(null)}
-                  autoCapitalize="none"
-                  keyboardType="url"
-                  returnKeyType="next"
-                  onSubmitEditing={() => emailRef.current?.focus()}
-                  placeholder="https://your-server.com"
-                  placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.text.primary}
-                />
-              </View>
-            </View>
+            <View style={styles.fields}>
+              <Input
+                label="Server"
+                value={serverUrl}
+                onChangeText={setServerUrl}
+                onFocus={() => setActiveField('server')}
+                onBlur={() => setActiveField(null)}
+                autoCapitalize="none"
+                keyboardType="url"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                placeholder="https://your-server.com"
+                accessibilityLabel="Server URL"
+                leftIcon={
+                  <Server
+                    size={18}
+                    color={activeField === 'server' ? colors.text.primary : colors.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                containerStyle={styles.field}
+              />
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <View style={[
-                styles.inputWrapper,
-                activeField === 'email' && styles.inputActive,
-              ]}>
-                <Mail
-                  size={18}
-                  color={activeField === 'email' ? colors.text.primary : colors.text.tertiary}
-                  strokeWidth={1.8}
-                />
-                <TextInput
-                  ref={emailRef}
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  onFocus={() => setActiveField('email')}
-                  onBlur={() => setActiveField(null)}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  placeholder="admin@company.com"
-                  placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.text.primary}
-                />
-              </View>
-            </View>
+              <Input
+                ref={emailRef}
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setActiveField('email')}
+                onBlur={() => setActiveField(null)}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                placeholder="admin@company.com"
+                accessibilityLabel="Email"
+                leftIcon={
+                  <Mail
+                    size={18}
+                    color={activeField === 'email' ? colors.text.primary : colors.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                containerStyle={styles.field}
+              />
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Password</Text>
-              <View style={[
-                styles.inputWrapper,
-                activeField === 'password' && styles.inputActive,
-              ]}>
-                <Lock
-                  size={18}
-                  color={activeField === 'password' ? colors.text.primary : colors.text.tertiary}
-                  strokeWidth={1.8}
-                />
-                <TextInput
-                  ref={passwordRef}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setActiveField('password')}
-                  onBlur={() => setActiveField(null)}
-                  secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                  placeholder="••••••••"
-                  placeholderTextColor={colors.text.disabled}
-                  selectionColor={colors.text.primary}
-                />
-                <Pressable
-                  onPress={() => setShowPassword(v => !v)}
-                  hitSlop={8}
-                >
-                  {showPassword
-                    ? <Eye size={18} color={colors.text.tertiary} strokeWidth={1.8} />
-                    : <EyeOff size={18} color={colors.text.tertiary} strokeWidth={1.8} />
-                  }
-                </Pressable>
-              </View>
+              <Input
+                ref={passwordRef}
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setActiveField('password')}
+                onBlur={() => setActiveField(null)}
+                isPassword
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                placeholder="••••••••"
+                accessibilityLabel="Password"
+                leftIcon={
+                  <Lock
+                    size={18}
+                    color={activeField === 'password' ? colors.text.primary : colors.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                containerStyle={styles.field}
+              />
             </View>
 
             {error && (
@@ -198,6 +173,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Pressable
               onPress={handleLogin}
               disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Continue to sign in"
               style={({ pressed }) => [
                 styles.submitButton,
                 pressed && styles.submitPressed,
@@ -287,36 +264,14 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   formSubtitle: {
     ...typography.body,
     color: colors.text.tertiary,
-    marginBottom: 32,
+    marginBottom: 28,
   },
-  fieldGroup: {
-    marginBottom: 18,
+  fields: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
-  fieldLabel: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: radius.lg,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 4,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    gap: 12,
-  },
-  inputActive: {
-    borderColor: colors.border.focus,
-    backgroundColor: colors.surfaceElevated,
-  },
-  input: {
-    flex: 1,
-    ...typography.bodyLg,
-    color: colors.text.primary,
-    paddingVertical: Platform.OS === 'android' ? 12 : 0,
+  field: {
+    marginBottom: 0,
   },
   errorBanner: {
     backgroundColor: colors.errorMuted,

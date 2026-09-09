@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+﻿import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,15 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, User, Phone, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingState } from '../components/ui/LoadingState';
 import { elevaticsAPI, ElevaticsDriver } from '../api/elevatics';
 
 export const DriversScreen: React.FC = () => {
@@ -79,15 +81,14 @@ export const DriversScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
             <ArrowLeft size={22} color={colors.text.primary} />
           </Pressable>
-          <Text style={styles.title}>Drivers</Text>
-          <Pressable onPress={openCreate} style={styles.addBtn}>
+          <Text style={styles.title} accessibilityRole="header">Drivers</Text>
+          <Pressable onPress={openCreate} style={styles.addBtn} accessibilityRole="button" accessibilityLabel="Add driver">
             <Plus size={20} color={colors.primary} />
           </Pressable>
         </View>
@@ -96,9 +97,12 @@ export const DriversScreen: React.FC = () => {
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDrivers} tintColor={colors.primary} />}
         >
+          {loading && drivers.length === 0 ? (
+            <LoadingState label="Loading driversâ€¦" />
+          ) : null}
           {drivers.map(driver => (
             <GlassCard key={driver.id} style={styles.card}>
-              <Pressable onPress={() => openEdit(driver)}>
+              <Pressable onPress={() => openEdit(driver)} accessibilityRole="button" accessibilityLabel={`Edit ${driver.name}`}>
                 <View style={styles.cardHeader}>
                   <View style={styles.iconWrap}>
                     <User size={18} color={colors.primary} />
@@ -107,7 +111,7 @@ export const DriversScreen: React.FC = () => {
                     <Text style={styles.driverName}>{driver.name}</Text>
                     <Text style={styles.driverId}>ID: {driver.uniqueId}</Text>
                   </View>
-                  <Pressable onPress={() => deleteDriver(driver)} hitSlop={8}>
+                  <Pressable onPress={() => deleteDriver(driver)} hitSlop={8} accessibilityLabel={`Delete ${driver.name}`}>
                     <Trash2 size={18} color={colors.error} />
                   </Pressable>
                 </View>
@@ -131,7 +135,13 @@ export const DriversScreen: React.FC = () => {
             </GlassCard>
           ))}
           {!loading && drivers.length === 0 && (
-            <Text style={styles.empty}>No drivers yet. Tap + to add one.</Text>
+            <EmptyState
+              icon={<User size={28} color={colors.text.tertiary} strokeWidth={1.5} />}
+              title="No drivers yet"
+              subtitle="Tap + to add a driver to your fleet"
+              actionLabel="Add driver"
+              onAction={openCreate}
+            />
           )}
         </ScrollView>
       </SafeAreaView>
@@ -151,17 +161,16 @@ export const DriversScreen: React.FC = () => {
           </GlassCard>
         </View>
       </Modal>
-    </View>
+    </ScreenBackground>
   );
 };
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { padding: 8, marginRight: 8 },
+  backBtn: { padding: 8, marginRight: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { ...typography.h2, color: colors.text.primary, flex: 1 },
-  addBtn: { padding: 8 },
+  addBtn: { padding: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
   card: { padding: 14 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -172,10 +181,9 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   metaRow: { flexDirection: 'row', gap: 12, marginTop: 10, flexWrap: 'wrap' },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { ...typography.small, color: colors.text.secondary },
-  empty: { ...typography.body, color: colors.text.tertiary, textAlign: 'center', marginTop: 40 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: { margin: 16, padding: 20, borderRadius: 16 },
   modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
+  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary, minHeight: 48 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
 });

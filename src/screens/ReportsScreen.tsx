@@ -34,10 +34,12 @@ import { radius } from '../theme/radius';
 import { GlassCard } from '../components/GlassCard';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { EmptyState } from '../components/ui/EmptyState';
 import { sanitizeBrandText } from '../utils/brandText';
 import { elevaticsAPI, ElevaticsTrip, ElevaticsSummary, ElevaticsStop, ElevaticsEvent, ElevaticsPosition } from '../api/elevatics';
 import { useFleetStore } from '../stores/fleetStore';
 import { usePrefsStore } from '../stores/prefsStore';
+import { useTabBarBottomInset } from '../utils/tabBarInset';
 import { WebMapView } from '../components/WebMapView';
 import { getThemeBaseMapLayer } from '../utils/mapTheme';
 import { MetricCard } from '../components/ui/MetricCard';
@@ -122,6 +124,7 @@ function getDateRange(range: string): { from: string; to: string } {
 
 export const ReportsScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
+  const tabBarInset = useTabBarBottomInset(24);
   const { devices, setDevices } = useFleetStore();
   const { prefs } = usePrefsStore();
   const [reportType, setReportType] = useState<ReportType>('route');
@@ -297,7 +300,7 @@ export const ReportsScreen: React.FC = () => {
     safeArea: { flex: 1 },
     scrollContent: {
       paddingHorizontal: spacing.screenPadding,
-      paddingBottom: 120,
+      paddingBottom: tabBarInset,
     },
     section: { marginBottom: 28 },
     sectionLabel: {
@@ -479,7 +482,7 @@ export const ReportsScreen: React.FC = () => {
       fontWeight: '600',
       marginBottom: 8,
     },
-  }), [colors]);
+  }), [colors, tabBarInset]);
 
   return (
     <ScreenBackground>
@@ -1308,19 +1311,11 @@ const StopRow: React.FC<{ stop: ElevaticsStop }> = ({ stop }) => {
 const EmptyResult: React.FC<{ message: string }> = ({ message }) => {
   const { colors } = useTheme();
 
-  const emStyles = useMemo(() => StyleSheet.create({
-    container: {
-      alignItems: 'center',
-      paddingVertical: 40,
-      gap: 10,
-    },
-    text: { ...typography.caption, color: colors.text.tertiary, textAlign: 'center' },
-  }), [colors]);
-
   return (
-    <View style={emStyles.container}>
-      <BarChart3 size={32} color={colors.text.tertiary} strokeWidth={1.5} />
-      <Text style={emStyles.text}>{message}</Text>
-    </View>
+    <EmptyState
+      icon={<BarChart3 size={28} color={colors.text.tertiary} strokeWidth={1.5} />}
+      title="No results"
+      subtitle={message}
+    />
   );
 };

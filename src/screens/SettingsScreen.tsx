@@ -42,9 +42,11 @@ import { radius } from '../theme/radius';
 import { GlassCard } from '../components/GlassCard';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { ListRow } from '../components/ui/ListRow';
 import { useAuthStore } from '../stores/authStore';
 import { usePrefsStore } from '../stores/prefsStore';
 import { elevaticsWS } from '../api/websocket';
+import { useTabBarBottomInset } from '../utils/tabBarInset';
 import type { ThemeMode } from '../theme/themes';
 
 interface SettingsScreenProps {
@@ -55,7 +57,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const router = useRouter();
   const { user, serverUrl, logout } = useAuthStore();
   const { prefs, initialize: initPrefs, setPref, savePrefs } = usePrefsStore();
-  const { colors, isDark, themeMode, setThemeMode } = useTheme();
+  const { colors, themeMode, setThemeMode } = useTheme();
+  const tabBarInset = useTabBarBottomInset();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [wsConnected, setWsConnected] = useState(elevaticsWS.isConnected);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -119,15 +122,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
+  const rowRight = (value: string, valueColor?: string) => (
+    <Text style={[styles.rowValue, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
+      {value}
+    </Text>
+  );
+
+  const iconLeft = (icon: React.ReactNode, accent?: string) => (
+    <View style={[styles.iconWrap, { backgroundColor: accent ? `${accent}14` : colors.backgroundSecondary }]}>
+      {icon}
+    </View>
+  );
+
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
+          showsVerticalScrollIndicator={false}
+        >
           <Animated.View entering={FadeInDown.delay(0).duration(500)}>
             <ScreenHeader title="Settings" />
           </Animated.View>
 
-          {/* Profile card */}
           <Animated.View entering={FadeInDown.delay(60).duration(500)}>
             <GlassCard variant="elevated" style={styles.profileCard}>
               <View style={styles.profileRow}>
@@ -144,75 +161,175 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                     </View>
                   )}
                 </View>
-                <Pressable style={styles.editBtn}>
+                <Pressable style={styles.editBtn} accessibilityRole="button" accessibilityLabel="Edit profile">
                   <ChevronRight size={18} color={colors.text.tertiary} strokeWidth={1.8} />
                 </Pressable>
               </View>
             </GlassCard>
           </Animated.View>
 
-          {/* Connection section */}
           <Animated.View entering={FadeInDown.delay(120).duration(500)}>
             <SectionLabel title="Connection" colors={colors} />
-            <View style={styles.settingsGroup}>
-              <SettingsRow colors={colors} icon={<Server size={18} color={colors.blue} strokeWidth={1.8} />} label="Server URL" value={serverUrl} accent={colors.blue} onPress={() => {}} chevron={false} />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<Wifi size={18} color={wsConnected ? colors.success : colors.text.tertiary} strokeWidth={1.8} />} label="Live connection" value={wsConnected ? 'Connected' : 'Disconnected'} valueColor={wsConnected ? colors.success : colors.error} accent={wsConnected ? colors.success : colors.error} onPress={handleReconnectWS} chevron actionIcon={<RefreshCw size={14} color={colors.text.tertiary} strokeWidth={2} />} />
+            <View style={styles.rowStack}>
+              <ListRow
+                title="Server URL"
+                left={iconLeft(<Server size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                right={rowRight(serverUrl || '')}
+                showChevron={false}
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Live connection"
+                left={iconLeft(
+                  <Wifi size={18} color={wsConnected ? colors.success : colors.text.tertiary} strokeWidth={1.8} />,
+                  wsConnected ? colors.success : colors.error,
+                )}
+                right={
+                  <View style={styles.rightCluster}>
+                    {rowRight(wsConnected ? 'Connected' : 'Disconnected', wsConnected ? colors.success : colors.error)}
+                    <RefreshCw size={14} color={colors.text.tertiary} strokeWidth={2} />
+                  </View>
+                }
+                onPress={handleReconnectWS}
+                accessibilityLabel="Reconnect live connection"
+                style={styles.listRow}
+              />
             </View>
           </Animated.View>
 
-          {/* Appearance section */}
           <Animated.View entering={FadeInDown.delay(150).duration(500)}>
             <SectionLabel title="Appearance" colors={colors} />
-            <View style={styles.settingsGroup}>
-              <SettingsRow colors={colors} icon={<ThemeIcon size={18} color={colors.blue} strokeWidth={1.8} />} label="Theme" value={themeLabel} onPress={cycleTheme} chevron />
+            <View style={styles.rowStack}>
+              <ListRow
+                title="Theme"
+                left={iconLeft(<ThemeIcon size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                right={rowRight(themeLabel)}
+                onPress={cycleTheme}
+                accessibilityLabel={`Theme, ${themeLabel}`}
+                style={styles.listRow}
+              />
             </View>
           </Animated.View>
 
-          {/* Preferences section */}
           <Animated.View entering={FadeInDown.delay(180).duration(500)}>
             <SectionLabel title="Preferences" colors={colors} />
-            <View style={styles.settingsGroup}>
-              <SettingsRow colors={colors} icon={<Ruler size={18} color={colors.primary} strokeWidth={1.8} />} label="Distance unit" value={prefs.distanceUnit.toUpperCase()} onPress={() => cyclePref('distanceUnit', ['km', 'mi', 'nm'])} chevron />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<Gauge size={18} color={colors.blue} strokeWidth={1.8} />} label="Speed unit" value={prefs.speedUnit === 'kmh' ? 'KM/H' : prefs.speedUnit === 'mph' ? 'MPH' : 'KN'} onPress={() => cyclePref('speedUnit', ['kmh', 'mph', 'kn'])} chevron />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<Fuel size={18} color={colors.accent} strokeWidth={1.8} />} label="Fuel unit" value={prefs.fuelUnit === 'liters' ? 'Liters' : prefs.fuelUnit === 'us_gallons' ? 'US Gal' : 'Imp Gal'} onPress={() => cyclePref('fuelUnit', ['liters', 'us_gallons', 'imp_gallons'])} chevron />
-              <Separator colors={colors} />
-              <SettingsToggleRow colors={colors} icon={<Bell size={18} color={colors.accent} strokeWidth={1.8} />} label="Push notifications" value={notificationsEnabled} onToggle={setNotificationsEnabled} />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<Map size={18} color={colors.primary} strokeWidth={1.8} />} label="Save preferences" value={savingPrefs ? 'Saving...' : 'Sync to server'} onPress={handleSavePrefs} chevron />
+            <View style={styles.rowStack}>
+              <ListRow
+                title="Distance unit"
+                left={iconLeft(<Ruler size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                right={rowRight(prefs.distanceUnit.toUpperCase())}
+                onPress={() => cyclePref('distanceUnit', ['km', 'mi', 'nm'])}
+                accessibilityLabel="Distance unit"
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Speed unit"
+                left={iconLeft(<Gauge size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                right={rowRight(prefs.speedUnit === 'kmh' ? 'KM/H' : prefs.speedUnit === 'mph' ? 'MPH' : 'KN')}
+                onPress={() => cyclePref('speedUnit', ['kmh', 'mph', 'kn'])}
+                accessibilityLabel="Speed unit"
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Fuel unit"
+                left={iconLeft(<Fuel size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                right={rowRight(prefs.fuelUnit === 'liters' ? 'Liters' : prefs.fuelUnit === 'us_gallons' ? 'US Gal' : 'Imp Gal')}
+                onPress={() => cyclePref('fuelUnit', ['liters', 'us_gallons', 'imp_gallons'])}
+                accessibilityLabel="Fuel unit"
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Push notifications"
+                left={iconLeft(<Bell size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                right={
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    trackColor={{ false: colors.border.default, true: `${colors.primary}60` }}
+                    thumbColor={notificationsEnabled ? colors.primary : colors.text.tertiary}
+                    accessibilityLabel="Push notifications"
+                  />
+                }
+                showChevron={false}
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Save preferences"
+                left={iconLeft(<Map size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                right={rowRight(savingPrefs ? 'Saving...' : 'Sync to server')}
+                onPress={handleSavePrefs}
+                accessibilityLabel="Save preferences"
+                style={styles.listRow}
+              />
             </View>
           </Animated.View>
 
           {user?.administrator && (
             <Animated.View entering={FadeInDown.delay(210).duration(500)}>
               <SectionLabel title="Administration" colors={colors} />
-              <View style={styles.settingsGroup}>
-                <SettingsRow colors={colors} icon={<Navigation size={18} color={colors.primary} strokeWidth={1.8} />} label="Manage vehicles" onPress={() => router.push('/admin/vehicles')} chevron />
-                <Separator colors={colors} />
-                <SettingsRow colors={colors} icon={<User size={18} color={colors.blue} strokeWidth={1.8} />} label="Manage drivers" onPress={() => router.push('/admin/drivers')} chevron />
-                <Separator colors={colors} />
-                <SettingsRow colors={colors} icon={<Users size={18} color={colors.accent} strokeWidth={1.8} />} label="User access" onPress={() => router.push('/admin/users')} chevron />
+              <View style={styles.rowStack}>
+                <ListRow
+                  title="Manage vehicles"
+                  left={iconLeft(<Navigation size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                  onPress={() => router.push('/admin/vehicles')}
+                  accessibilityLabel="Manage vehicles"
+                  style={styles.listRow}
+                />
+                <ListRow
+                  title="Manage drivers"
+                  left={iconLeft(<User size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                  onPress={() => router.push('/admin/drivers')}
+                  accessibilityLabel="Manage drivers"
+                  style={styles.listRow}
+                />
+                <ListRow
+                  title="User access"
+                  left={iconLeft(<Users size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                  onPress={() => router.push('/admin/users')}
+                  accessibilityLabel="User access"
+                  style={styles.listRow}
+                />
               </View>
             </Animated.View>
           )}
 
-          {/* App section */}
           <Animated.View entering={FadeInDown.delay(240).duration(500)}>
             <SectionLabel title="App" colors={colors} />
-            <View style={styles.settingsGroup}>
-              <SettingsRow colors={colors} icon={<Database size={18} color={colors.text.secondary} strokeWidth={1.8} />} label="Clear cache" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); Alert.alert('Cache cleared', 'Local data has been cleared.'); }} chevron />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<Info size={18} color={colors.text.secondary} strokeWidth={1.8} />} label="App version" value="1.0.0" chevron={false} />
-              <Separator colors={colors} />
-              <SettingsRow colors={colors} icon={<HelpCircle size={18} color={colors.text.secondary} strokeWidth={1.8} />} label="Help & Support" onPress={() => {}} chevron />
+            <View style={styles.rowStack}>
+              <ListRow
+                title="Clear cache"
+                left={iconLeft(<Database size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert('Cache cleared', 'Local data has been cleared.');
+                }}
+                accessibilityLabel="Clear cache"
+                style={styles.listRow}
+              />
+              <ListRow
+                title="App version"
+                left={iconLeft(<Info size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                right={rowRight('1.0.0')}
+                showChevron={false}
+                style={styles.listRow}
+              />
+              <ListRow
+                title="Help & Support"
+                left={iconLeft(<HelpCircle size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                onPress={() => {}}
+                accessibilityLabel="Help and support"
+                style={styles.listRow}
+              />
             </View>
           </Animated.View>
 
-          {/* Logout */}
-          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ marginBottom: 120 }}>
-            <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutBtn, pressed && styles.pressed]}>
+          <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+            <Pressable
+              onPress={handleLogout}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              style={({ pressed }) => [styles.logoutBtn, pressed && styles.pressed]}
+            >
               <LogOut size={18} color={colors.error} strokeWidth={1.8} />
               <Text style={styles.logoutText}>Sign out</Text>
             </Pressable>
@@ -223,68 +340,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   );
 };
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
 type ThemeColors = ReturnType<typeof useTheme>['colors'];
 
 const SectionLabel: React.FC<{ title: string; colors: ThemeColors }> = ({ title, colors }) => (
   <Text style={{ ...typography.sectionLabel, color: colors.text.tertiary, marginBottom: 8, marginTop: 28, paddingHorizontal: 4 }}>{title}</Text>
 );
-
-const Separator: React.FC<{ colors: ThemeColors }> = ({ colors }) => (
-  <View style={{ height: 1, backgroundColor: colors.border.subtle, marginHorizontal: 14 }} />
-);
-
-const SettingsRow: React.FC<{
-  colors: ThemeColors;
-  icon: React.ReactNode;
-  label: string;
-  value?: string;
-  valueColor?: string;
-  accent?: string;
-  onPress?: () => void;
-  chevron?: boolean;
-  actionIcon?: React.ReactNode;
-}> = ({ colors, icon, label, value, valueColor, accent, onPress, chevron = true, actionIcon }) => {
-  const styles = useMemo(() => makeRowStyles(colors), [colors]);
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && onPress && styles.pressed]} disabled={!onPress}>
-      <View style={[styles.iconWrap, { backgroundColor: accent ? `${accent}14` : colors.backgroundSecondary }]}>{icon}</View>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.right}>
-        {value && <Text style={[styles.value, valueColor ? { color: valueColor } : {}]} numberOfLines={1}>{value}</Text>}
-        {actionIcon}
-        {chevron && <ChevronRight size={16} color={colors.text.tertiary} strokeWidth={1.8} />}
-      </View>
-    </Pressable>
-  );
-};
-
-const SettingsToggleRow: React.FC<{
-  colors: ThemeColors;
-  icon: React.ReactNode;
-  label: string;
-  value: boolean;
-  onToggle: (v: boolean) => void;
-}> = ({ colors, icon, label, value, onToggle }) => {
-  const styles = useMemo(() => makeRowStyles(colors), [colors]);
-  return (
-    <View style={styles.row}>
-      <View style={[styles.iconWrap, { backgroundColor: colors.backgroundSecondary }]}>{icon}</View>
-      <Text style={styles.label}>{label}</Text>
-      <Switch value={value} onValueChange={onToggle} trackColor={{ false: colors.border.default, true: `${colors.primary}60` }} thumbColor={value ? colors.primary : colors.text.tertiary} />
-    </View>
-  );
-};
-
-const makeRowStyles = (colors: ThemeColors) => StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
-  pressed: { backgroundColor: colors.backgroundSecondary, opacity: 0.85 },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  label: { ...typography.body, color: colors.text.primary, flex: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160 },
-  value: { ...typography.caption, color: colors.text.tertiary, flexShrink: 1 },
-});
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: { flex: 1 },
@@ -299,7 +359,11 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   adminBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentMuted, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start', marginTop: 2 },
   adminText: { ...typography.tiny, color: colors.text.secondary, fontWeight: '600' },
   editBtn: { padding: 4 },
-  settingsGroup: { backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border.subtle, overflow: 'hidden' },
+  rowStack: { gap: 8 },
+  listRow: {},
+  iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rowValue: { ...typography.caption, color: colors.text.tertiary, maxWidth: 140 },
+  rightCluster: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius.card, padding: 18, marginTop: 28, borderWidth: 1, borderColor: colors.border.alert },
   logoutText: { ...typography.bodyMd, color: colors.error, fontWeight: '600' },
   pressed: { opacity: 0.8 },

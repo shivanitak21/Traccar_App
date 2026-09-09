@@ -25,12 +25,17 @@ export const darkColors = {
 
   success: '#30D158',
   successMuted: 'rgba(48, 209, 88, 0.14)',
-  warning: '#64D2FF',
-  warningMuted: 'rgba(100, 210, 255, 0.14)',
-  error: '#D4956E',
-  errorMuted: 'rgba(212, 149, 110, 0.14)',
+  warning: '#FF9F0A',
+  warningMuted: 'rgba(255, 159, 10, 0.14)',
+  error: '#FF453A',
+  errorMuted: 'rgba(255, 69, 58, 0.14)',
   info: '#0A84FF',
   infoMuted: 'rgba(10, 132, 255, 0.14)',
+
+  disabled: 'rgba(255, 255, 255, 0.22)',
+  overlay: 'rgba(0, 0, 0, 0.48)',
+  overlayHeavy: 'rgba(0, 0, 0, 0.64)',
+  scrim: 'rgba(0, 0, 0, 0.40)',
 
   text: {
     primary: '#FFFFFF',
@@ -39,8 +44,8 @@ export const darkColors = {
     disabled: 'rgba(255, 255, 255, 0.22)',
     inverse: '#000000',
     accent: '#0A84FF',
-    warning: '#64D2FF',
-    error: '#D4956E',
+    warning: '#FF9F0A',
+    error: '#FF453A',
   },
 
   border: {
@@ -49,7 +54,7 @@ export const darkColors = {
     strong: 'rgba(255, 255, 255, 0.16)',
     focus: 'rgba(255, 255, 255, 0.40)',
     accent: 'rgba(10, 132, 255, 0.35)',
-    alert: 'rgba(212, 149, 110, 0.22)',
+    alert: 'rgba(255, 69, 58, 0.22)',
   },
 
   glass: {
@@ -62,7 +67,7 @@ export const darkColors = {
   status: {
     online: '#30D158',
     offline: '#636366',
-    idle: '#64D2FF',
+    idle: '#FF9F0A',
     moving: '#0A84FF',
     unknown: '#8E8E93',
   },
@@ -71,7 +76,7 @@ export const darkColors = {
     dark: ['#000000', '#0A0A0A'] as const,
     darkDeep: ['#000000', '#000000'] as const,
     emerald: ['#30D158', '#248A3D'] as const,
-    amber: ['#64D2FF', '#0A84FF'] as const,
+    amber: ['#FF9F0A', '#FF6B00'] as const,
     blue: ['#0A84FF', '#0066CC'] as const,
     card: ['rgba(28, 28, 30, 0.95)', 'rgba(10, 10, 10, 0.98)'] as const,
     surface: ['rgba(0, 0, 0, 0.0)', 'rgba(0, 0, 0, 0.85)'] as const,
@@ -81,7 +86,7 @@ export const darkColors = {
     brand: ['#0A84FF', '#0056CC'] as const,
   },
 
-  chart: ['#30D158', '#0A84FF', '#64D2FF', '#BF5AF2', '#D4956E', '#5AC8FA'],
+  chart: ['#30D158', '#0A84FF', '#FF9F0A', '#BF5AF2', '#FF453A', '#5AC8FA'],
 
   tabBar: {
     background: 'rgba(28, 28, 30, 0.88)',
@@ -114,14 +119,19 @@ export const lightColors = {
   blue: '#007AFF',
   blueMuted: 'rgba(0, 122, 255, 0.12)',
 
-  success: '#28A745',
-  successMuted: 'rgba(40, 167, 69, 0.12)',
-  warning: '#3B9EFF',
-  warningMuted: 'rgba(59, 158, 255, 0.12)',
-  error: '#C0522A',
-  errorMuted: 'rgba(192, 82, 42, 0.12)',
+  success: '#34C759',
+  successMuted: 'rgba(52, 199, 89, 0.12)',
+  warning: '#FF9500',
+  warningMuted: 'rgba(255, 149, 0, 0.12)',
+  error: '#FF3B30',
+  errorMuted: 'rgba(255, 59, 48, 0.12)',
   info: '#007AFF',
   infoMuted: 'rgba(0, 122, 255, 0.12)',
+
+  disabled: 'rgba(0, 0, 0, 0.22)',
+  overlay: 'rgba(0, 0, 0, 0.32)',
+  overlayHeavy: 'rgba(0, 0, 0, 0.48)',
+  scrim: 'rgba(0, 0, 0, 0.28)',
 
   text: {
     primary: '#000000',
@@ -130,8 +140,8 @@ export const lightColors = {
     disabled: 'rgba(0, 0, 0, 0.22)',
     inverse: '#FFFFFF',
     accent: '#007AFF',
-    warning: '#3B9EFF',
-    error: '#C0522A',
+    warning: '#FF9500',
+    error: '#FF3B30',
   },
 
   border: {
@@ -140,7 +150,7 @@ export const lightColors = {
     strong: 'rgba(0, 0, 0, 0.20)',
     focus: 'rgba(0, 0, 0, 0.36)',
     accent: 'rgba(0, 122, 255, 0.30)',
-    alert: 'rgba(192, 82, 42, 0.20)',
+    alert: 'rgba(255, 59, 48, 0.20)',
   },
 
   glass: {
@@ -151,9 +161,9 @@ export const lightColors = {
   },
 
   status: {
-    online: '#28A745',
+    online: '#34C759',
     offline: '#8E8E93',
-    idle: '#3B9EFF',
+    idle: '#FF9500',
     moving: '#007AFF',
     unknown: '#8E8E93',
   },
@@ -161,8 +171,8 @@ export const lightColors = {
   gradient: {
     dark: ['#F2F2F7', '#FFFFFF'] as const,
     darkDeep: ['#F2F2F7', '#F2F2F7'] as const,
-    emerald: ['#28A745', '#1E7E34'] as const,
-    amber: ['#3B9EFF', '#007AFF'] as const,
+    emerald: ['#34C759', '#248A3D'] as const,
+    amber: ['#FF9500', '#FF6B00'] as const,
     blue: ['#007AFF', '#0056CC'] as const,
     card: ['rgba(255, 255, 255, 0.95)', 'rgba(242, 242, 247, 0.98)'] as const,
     surface: ['rgba(242, 242, 247, 0.0)', 'rgba(242, 242, 247, 0.85)'] as const,
@@ -172,7 +182,7 @@ export const lightColors = {
     brand: ['#007AFF', '#0056CC'] as const,
   },
 
-  chart: ['#28A745', '#007AFF', '#3B9EFF', '#8B5CF6', '#C0522A', '#0EA5E9'],
+  chart: ['#34C759', '#007AFF', '#FF9500', '#AF52DE', '#FF3B30', '#0EA5E9'],
 
   tabBar: {
     background: 'rgba(255, 255, 255, 0.92)',
@@ -182,5 +192,5 @@ export const lightColors = {
   },
 } as const;
 
-export type ThemeColors = typeof darkColors;
+export type ThemeColors = typeof darkColors | typeof lightColors;
 export type ThemeMode = 'dark' | 'light' | 'system';

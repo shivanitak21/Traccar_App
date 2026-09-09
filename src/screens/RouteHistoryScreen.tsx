@@ -5,7 +5,7 @@ import {
   Text,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   Modal,
   TextInput,
   Platform,
@@ -697,13 +697,13 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
         </View>
 
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
+          <Pressable style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
             <Filter color={colors.text.primary} size={20} />
-          </TouchableOpacity>
+          </Pressable>
           {onClose && (
-            <TouchableOpacity style={styles.closeButtonHeader} onPress={onClose}>
+            <Pressable style={styles.closeButtonHeader} onPress={onClose}>
               <X color={colors.text.primary} size={20} />
-            </TouchableOpacity>
+            </Pressable>
           )}
         </View>
       </View>
@@ -726,12 +726,12 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 mapLayer={getThemeBaseMapLayer(isDark)}
                 style={styles.map}
               />
-              <TouchableOpacity
+              <Pressable
                 style={styles.closeMapButton}
                 onPress={() => setShowRouteOnMap(false)}
               >
                 <X color={colors.text.primary} size={20} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.mapContainer}>
@@ -811,13 +811,13 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                       {segment.positions.length} points
                     </Text>
                   </View>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.viewButton}
                     onPress={() => handleViewRoute(segment)}
                   >
                     <Eye color={colors.primary} size={18} />
                     <Text style={styles.viewButtonText}>View</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </GlassCard>
             ))}
@@ -835,14 +835,14 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Time Range</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+              <Pressable onPress={() => setShowFilterModal(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.filterOptions}>
               {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
-                <TouchableOpacity
+                <Pressable
                   key={filter}
                   style={[
                     styles.filterOption,
@@ -858,7 +858,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                   >
                     {getFilterLabel(filter)}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           </GlassCard>
@@ -875,52 +875,52 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Custom Date Range</Text>
-              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+              <Pressable onPress={() => setShowCustomDatePicker(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <ScrollView style={styles.datePickerScrollView}>
               <View style={styles.datePickerContainer}>
                 <Text style={styles.dateLabel}>From Date & Time</Text>
                 <View style={styles.dateRow}>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.dateButton}
                     onPress={() => setShowFromDatePicker(true)}
                   >
                     <Calendar color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={styles.timeButton}
                     onPress={() => setShowFromTimePicker(true)}
                   >
                     <Clock color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
 
                 <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
                 <View style={styles.dateRow}>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.dateButton}
                     onPress={() => setShowToDatePicker(true)}
                   >
                     <Calendar color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={styles.timeButton}
                     onPress={() => setShowToTimePicker(true)}
                   >
                     <Clock color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
 
-                <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+                <Pressable style={styles.applyButton} onPress={handleCustomDateApply}>
                   <Text style={styles.applyButtonText}>Apply</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               {showFromDatePicker && (

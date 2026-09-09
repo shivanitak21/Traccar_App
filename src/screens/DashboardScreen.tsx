@@ -37,6 +37,9 @@ import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader, HeaderIconButton } from '../components/ui/ScreenHeader';
 import { StatusChip } from '../components/ui/StatusChip';
 import { DeviceCardSkeleton } from '../components/ui/SkeletonLoader';
+import { FleetStatsStrip } from '../components/ui/MetricCard';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 import { WebMapView, MapLayerType } from '../components/WebMapView';
 import { AlertsPanel, getUnreadAlertCount } from '../components/AlertsPanel';
 import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
@@ -48,6 +51,7 @@ import { useAuthStore } from '../stores/authStore';
 import { formatSpeed, type SpeedUnit } from '../utils/units';
 import { getLocationLabel } from '../utils/address';
 import { getThemeBaseMapLayer } from '../utils/mapTheme';
+import { useTabBarBottomInset } from '../utils/tabBarInset';
 
 const DEFAULT_MAP_CENTER = { latitude: 20.5937, longitude: 78.9629 };
 const MAP_HEIGHT = Math.min(Math.max(Dimensions.get('window').height * 0.54, 360), 520);
@@ -75,9 +79,11 @@ export const DashboardScreen: React.FC = () => {
 
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [alertsVisible, setAlertsVisible] = useState(false);
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
+  const tabBarInset = useTabBarBottomInset(24);
 
   const lockParentScroll = useCallback(() => setMapScrollEnabled(false), []);
   const unlockParentScroll = useCallback(() => setMapScrollEnabled(true), []);
@@ -105,6 +111,7 @@ export const DashboardScreen: React.FC = () => {
     if (!useAuthStore.getState().isAuthenticated) return;
     if (isRefresh) setRefreshing(true);
     try {
+      setLoadError(false);
       const [devicesData, positionsData] = await Promise.all([
         elevaticsAPI.getDevices(),
         elevaticsAPI.getPositions(),
@@ -113,11 +120,12 @@ export const DashboardScreen: React.FC = () => {
       setDevices(devicesData);
     } catch (err) {
       console.error('Dashboard load error:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [setDevices, updatePositions]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -205,7 +213,7 @@ export const DashboardScreen: React.FC = () => {
     <ScreenBackground variant="hero">
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
           showsVerticalScrollIndicator={false}
           scrollEnabled={mapScrollEnabled}
           nestedScrollEnabled
@@ -245,6 +253,21 @@ export const DashboardScreen: React.FC = () => {
               }
             />
           </Animated.View>
+
+          {loadError && !loading && devices.length === 0 ? (
+            <ErrorState onRetry={() => loadData()} style={{ marginBottom: 24 }} />
+          ) : null}
+
+          {!loading && (
+            <Animated.View entering={FadeInDown.delay(40).duration(500)} style={styles.section}>
+              <FleetStatsStrip
+                total={stats.total}
+                online={stats.online}
+                moving={stats.moving}
+                idle={stats.idle}
+              />
+            </Animated.View>
+          )}
 
           {!loading && (
             <Animated.View entering={FadeInDown.delay(60).duration(500)} style={styles.section}>
@@ -357,15 +380,13 @@ export const DashboardScreen: React.FC = () => {
                 <DeviceCardSkeleton />
               </View>
             ) : recentDevices.length === 0 ? (
-              <GlassCard style={styles.emptyCard} blur>
-                <View style={styles.emptyIconWrap}>
-                  <Car size={28} color={colors.text.tertiary} strokeWidth={1.5} />
-                </View>
-                <Text style={styles.emptyTitle}>No vehicles yet</Text>
-                <Text style={styles.emptySubtitle}>
-                  Your fleet will appear here once devices are connected
-                </Text>
-              </GlassCard>
+              <EmptyState
+                icon={<Car size={28} color={colors.text.tertiary} strokeWidth={1.5} />}
+                title="No vehicles yet"
+                subtitle="Your fleet will appear here once devices are connected"
+                actionLabel="Refresh"
+                onAction={() => loadData(true)}
+              />
             ) : (
               <GlassCard style={styles.vehicleListCard} padding={0} blur>
                 {recentDevices.map((device, idx) => (
@@ -520,7 +541,6 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
   scrollContent: {
     paddingHorizontal: spacing.screenPadding,
-    paddingBottom: 120,
   },
   wsIconWrap: {
     width: 28,
@@ -644,31 +664,5 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   vehicleListCard: {
     overflow: 'hidden',
     ...shadows.md,
-  },
-  emptyCard: {
-    padding: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  emptyIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    ...typography.bodyMd,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  emptySubtitle: {
-    ...typography.caption,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    maxWidth: 240,
   },
 });

@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
+import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
+import { createShadows } from '../theme/shadows';
 import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { elevaticsWS } from '../api/websocket';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView, MapLayerType } from '../components/WebMapView';
+import { IconButton } from '../components/ui/IconButton';
+import { StatusChip } from '../components/ui/StatusChip';
+import { LoadingState } from '../components/ui/LoadingState';
 import { MapPin, X, Layers } from 'lucide-react-native';
 import { useCompanionStore } from '../stores/companionStore';
 import { usePrefsStore } from '../stores/prefsStore';
@@ -21,8 +28,9 @@ export const MapScreen: React.FC = () => {
   const openCompanion = useCompanionStore(state => state.open);
   const { prefs } = usePrefsStore();
   const tabBarBottomInset = useTabBarBottomInset(12);
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const themeBaseLayer = getThemeBaseMapLayer(isDark);
 
   const [devices, setDevices] = useState<ElevaticsDevice[]>([]);
@@ -182,6 +190,7 @@ export const MapScreen: React.FC = () => {
   const selectedDevice = selectedDeviceId ? devices.find(d => d.id === selectedDeviceId) : null;
   const mapMarkers = getMarkers();
   const shouldFitAllMarkers = !selectedDeviceId && mapMarkers.length > 0;
+  const isMoving = selectedPosition ? (selectedPosition.speed * 1.852) >= 1 : false;
 
   const polylines = useMemo(() => {
     if (!selectedDeviceId) return [];
@@ -191,17 +200,16 @@ export const MapScreen: React.FC = () => {
     return [{
       id: 'trail',
       coordinates,
-      color: '#22c55e',
+      color: colors.success,
       width: 6,
       opacity: 1,
     }];
-  }, [selectedDeviceId, positionTrails]);
+  }, [selectedDeviceId, positionTrails, colors.success]);
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading map...</Text>
+      <View style={styles.container}>
+        <LoadingState label="Loading map…" fullScreen />
       </View>
     );
   }
@@ -230,66 +238,104 @@ export const MapScreen: React.FC = () => {
           style={styles.map}
         />
 
-        <TouchableOpacity style={styles.layerButton} onPress={() => setShowLayerSelector(!showLayerSelector)}>
-          <Layers color={colors.text.primary} size={20} />
-        </TouchableOpacity>
+        <View style={[styles.topControls, { top: insets.top + 12 }]}>
+          {positions.size === 0 ? (
+            <View style={styles.noDevicesBanner}>
+              <MapPin size={14} color={colors.text.secondary} strokeWidth={2} />
+              <Text style={styles.noDevicesText}>No live vehicle positions yet</Text>
+            </View>
+          ) : (
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{positions.size} live</Text>
+            </View>
+          )}
+
+          <IconButton
+            accessibilityLabel="Map layers"
+            onPress={() => setShowLayerSelector(!showLayerSelector)}
+            variant="filled"
+            style={styles.layerFab}
+          >
+            <Layers color={colors.text.primary} size={20} strokeWidth={1.8} />
+          </IconButton>
+        </View>
 
         {showLayerSelector && (
-          <View style={styles.layerSelector}>
-            <GlassCard style={styles.layerCard}>
+          <View style={[styles.layerSelector, { top: insets.top + 72 }]}>
+            <GlassCard style={styles.layerCard} blur>
               <Text style={styles.layerTitle}>Map Type</Text>
-              {mapLayers.map((layer) => (
-                <TouchableOpacity
-                  key={layer.type}
-                  style={[styles.layerOption, resolveMapLayer(mapLayer, isDark) === layer.type && styles.layerOptionActive]}
-                  onPress={() => { setMapLayer(layer.type); setShowLayerSelector(false); }}
-                >
-                  <Text style={[styles.layerOptionText, resolveMapLayer(mapLayer, isDark) === layer.type && styles.layerOptionTextActive]}>
-                    {layer.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {mapLayers.map((layer) => {
+                const active = resolveMapLayer(mapLayer, isDark) === layer.type;
+                return (
+                  <Pressable
+                    key={layer.type}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => [
+                      styles.layerOption,
+                      active && styles.layerOptionActive,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                    onPress={() => { setMapLayer(layer.type); setShowLayerSelector(false); }}
+                  >
+                    <Text style={[styles.layerOptionText, active && styles.layerOptionTextActive]}>
+                      {layer.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </GlassCard>
-          </View>
-        )}
-
-        {positions.size === 0 && (
-          <View style={styles.noDevicesBanner}>
-            <Text style={styles.noDevicesText}>No live vehicle positions yet</Text>
           </View>
         )}
 
         {selectedPosition && selectedDevice && (
           <View style={[styles.deviceDetailsOverlay, { bottom: tabBarBottomInset }]}>
-            <GlassCard style={styles.deviceDetailsCard}>
+            <GlassCard style={styles.deviceDetailsCard} blur>
               <View style={styles.deviceDetailsHeader}>
                 <View style={styles.deviceDetailsInfo}>
                   <Text style={styles.deviceDetailsName}>{selectedDevice.name}</Text>
-                  <Text style={styles.deviceDetailsSpeed}>
-                    {formatSpeed(selectedPosition.speed, prefs.speedUnit)}
-                  </Text>
+                  <View style={styles.chipRow}>
+                    <StatusChip
+                      label={formatSpeed(selectedPosition.speed, prefs.speedUnit)}
+                      variant={isMoving ? 'moving' : selectedDevice.status === 'online' ? 'idle' : 'offline'}
+                      size="sm"
+                    />
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => setSelectedDeviceId(null)} style={styles.closeButton}>
-                  <X color={colors.text.secondary} size={20} />
-                </TouchableOpacity>
+                <IconButton
+                  accessibilityLabel="Close vehicle details"
+                  onPress={() => setSelectedDeviceId(null)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <X color={colors.text.secondary} size={18} strokeWidth={2} />
+                </IconButton>
               </View>
               <View style={styles.deviceDetailsBody}>
-                <Text style={styles.address}>
-                  📍 {selectedDeviceId
-                    ? getLocationLabel({
-                        address: deviceAddresses.get(selectedDeviceId),
-                        positionAddress: selectedPosition.address,
-                        latitude: selectedPosition.latitude,
-                        longitude: selectedPosition.longitude,
-                      })
-                    : 'No address'}
-                </Text>
+                <View style={styles.addressRow}>
+                  <MapPin size={13} color={colors.text.tertiary} strokeWidth={2} />
+                  <Text style={styles.address} numberOfLines={2}>
+                    {selectedDeviceId
+                      ? getLocationLabel({
+                          address: deviceAddresses.get(selectedDeviceId),
+                          positionAddress: selectedPosition.address,
+                          latitude: selectedPosition.latitude,
+                          longitude: selectedPosition.longitude,
+                        })
+                      : 'No address'}
+                  </Text>
+                </View>
                 <Text style={styles.timestamp}>
-                  Last update: {new Date(selectedPosition.fixTime).toLocaleTimeString()}
+                  Last update · {new Date(selectedPosition.fixTime).toLocaleTimeString()}
                 </Text>
-                <TouchableOpacity style={styles.askAiBtn} onPress={() => openCompanion(selectedDevice.id, selectedDevice.name)}>
+                <Pressable
+                  style={({ pressed }) => [styles.askAiBtn, pressed && { opacity: 0.8 }]}
+                  onPress={() => openCompanion(selectedDevice.id, selectedDevice.name)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ask AI Companion"
+                >
                   <Text style={styles.askAiText}>Ask AI Companion</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </GlassCard>
           </View>
@@ -299,149 +345,156 @@ export const MapScreen: React.FC = () => {
   );
 };
 
-const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.text.secondary,
-    marginTop: 16,
-  },
-  mapContainer: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  noDevicesBanner: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 80,
-    backgroundColor: colors.glass.background,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  noDevicesText: {
-    ...typography.small,
-    color: colors.text.secondary,
-  },
-  deviceDetailsOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-  },
-  deviceDetailsCard: { padding: 16 },
-  deviceDetailsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  deviceDetailsInfo: { flex: 1 },
-  deviceDetailsName: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  deviceDetailsSpeed: {
-    ...typography.caption,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deviceDetailsBody: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
-  },
-  address: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  timestamp: {
-    ...typography.small,
-    color: colors.text.tertiary,
-  },
-  askAiBtn: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  askAiText: {
-    ...typography.smallMd,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  layerButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    zIndex: 10,
-  },
-  layerSelector: {
-    position: 'absolute',
-    top: 80,
-    right: 20,
-    zIndex: 10,
-    minWidth: 150,
-  },
-  layerCard: { padding: 12 },
-  layerTitle: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  layerOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  layerOptionActive: {
-    backgroundColor: colors.primaryGlow,
-  },
-  layerOptionText: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontSize: 14,
-  },
-  layerOptionTextActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-});
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors'], isDark: boolean) => {
+  const elevation = createShadows(isDark, colors);
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    mapContainer: {
+      flex: 1,
+      overflow: 'hidden',
+    },
+    map: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    topControls: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      zIndex: 10,
+      gap: 12,
+    },
+    noDevicesBanner: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.glass.background,
+      borderRadius: radius.lg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+      ...elevation.md,
+    },
+    noDevicesText: {
+      ...typography.smallMd,
+      color: colors.text.secondary,
+      flex: 1,
+    },
+    countBadge: {
+      backgroundColor: colors.glass.background,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+      ...elevation.sm,
+    },
+    countText: {
+      ...typography.smallMd,
+      color: colors.text.primary,
+    },
+    layerFab: {
+      ...elevation.md,
+    },
+    deviceDetailsOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      paddingHorizontal: spacing.md,
+    },
+    deviceDetailsCard: {
+      padding: spacing.md,
+      ...elevation.float,
+    },
+    deviceDetailsHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+      gap: 8,
+    },
+    deviceDetailsInfo: { flex: 1, gap: 8 },
+    deviceDetailsName: {
+      ...typography.h4,
+      color: colors.text.primary,
+    },
+    chipRow: {
+      flexDirection: 'row',
+    },
+    deviceDetailsBody: {
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border.subtle,
+      gap: 6,
+    },
+    addressRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    address: {
+      ...typography.small,
+      color: colors.text.secondary,
+      flex: 1,
+      lineHeight: 18,
+    },
+    timestamp: {
+      ...typography.tiny,
+      color: colors.text.tertiary,
+      marginLeft: 19,
+    },
+    askAiBtn: {
+      marginTop: 8,
+      alignSelf: 'flex-start',
+      backgroundColor: colors.primaryMuted,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: radius.control,
+      minHeight: 40,
+      justifyContent: 'center',
+    },
+    askAiText: {
+      ...typography.smallMd,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    layerSelector: {
+      position: 'absolute',
+      right: spacing.md,
+      zIndex: 10,
+      minWidth: 160,
+    },
+    layerCard: { padding: 12 },
+    layerTitle: {
+      ...typography.smallMd,
+      color: colors.text.secondary,
+      marginBottom: 8,
+    },
+    layerOption: {
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: radius.md,
+      marginBottom: 4,
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    layerOptionActive: {
+      backgroundColor: colors.primaryMuted,
+    },
+    layerOptionText: {
+      ...typography.body,
+      color: colors.text.primary,
+    },
+    layerOptionTextActive: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+  });
+};

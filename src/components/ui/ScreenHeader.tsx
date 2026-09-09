@@ -27,7 +27,12 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
     <View style={[styles.container, style]}>
       <View style={styles.textBlock}>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        <Text style={[styles.title, large && styles.titleLarge]}>{title}</Text>
+        <Text
+          style={[styles.title, large && styles.titleLarge]}
+          accessibilityRole="header"
+        >
+          {title}
+        </Text>
       </View>
       {right && <View style={styles.right}>{right}</View>}
     </View>
@@ -39,6 +44,7 @@ interface HeaderIconButtonProps {
   children: React.ReactNode;
   badge?: boolean;
   badgeCount?: number;
+  accessibilityLabel?: string;
 }
 
 export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
@@ -46,6 +52,7 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
   children,
   badge,
   badgeCount,
+  accessibilityLabel,
 }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -53,6 +60,8 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
     >
       {children}
@@ -101,9 +110,9 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     paddingBottom: 4,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',

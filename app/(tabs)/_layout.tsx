@@ -14,9 +14,7 @@ import {
 import { useTheme } from '../../src/theme/ThemeContext';
 import { typography } from '../../src/theme/typography';
 import { radius } from '../../src/theme/radius';
-
-const TAB_BAR_HEIGHT = 62;
-const TAB_BAR_FLOAT_GAP = 12;
+import { TAB_BAR_HEIGHT, TAB_BAR_FLOAT_GAP } from '../../src/utils/tabBarInset';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -34,6 +32,12 @@ export default function TabLayout() {
   if (!isAuthenticated) {
     return <Redirect href="/login" />;
   }
+
+  const focusedIconStyle = {
+    backgroundColor: colors.accentMuted,
+    borderRadius: radius.md,
+    padding: 5,
+  };
 
   return (
     <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
@@ -87,7 +91,7 @@ export default function TabLayout() {
           options={{
             title: 'Home',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? styles.iconActive : undefined}>
+              <View style={focused ? focusedIconStyle : undefined}>
                 <LayoutDashboard size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -98,7 +102,7 @@ export default function TabLayout() {
           options={{
             title: 'Vehicles',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? styles.iconActive : undefined}>
+              <View style={focused ? focusedIconStyle : undefined}>
                 <Navigation size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -109,7 +113,7 @@ export default function TabLayout() {
           options={{
             title: 'Map',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={[focused && { backgroundColor: colors.accentMuted, borderRadius: 12, padding: 5 }]}>
+              <View style={focused ? focusedIconStyle : undefined}>
                 <Map size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -126,7 +130,7 @@ export default function TabLayout() {
           options={{
             title: 'Reports',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? styles.iconActive : undefined}>
+              <View style={focused ? focusedIconStyle : undefined}>
                 <BarChart3 size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -137,7 +141,7 @@ export default function TabLayout() {
           options={{
             title: 'Settings',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? styles.iconActive : undefined}>
+              <View style={focused ? focusedIconStyle : undefined}>
                 <Settings size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
               </View>
             ),
@@ -159,8 +163,5 @@ const styles = StyleSheet.create({
     right: 24,
     height: 1,
     borderRadius: 1,
-  },
-  iconActive: {
-    transform: [{ scale: 1.05 }],
   },
 });

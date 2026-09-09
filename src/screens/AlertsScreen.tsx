@@ -26,9 +26,11 @@ import { radius } from '../theme/radius';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { EmptyState } from '../components/ui/EmptyState';
 import { elevaticsAPI, ElevaticsEvent } from '../api/elevatics';
 import { elevaticsWS } from '../api/websocket';
 import { useFleetStore } from '../stores/fleetStore';
+import { useTabBarBottomInset } from '../utils/tabBarInset';
 
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -61,6 +63,7 @@ function filterEvents(events: ElevaticsEvent[], tab: FilterTab): ElevaticsEvent[
 export const AlertsScreen: React.FC = () => {
   const { recentEvents, devices, addEvents } = useFleetStore();
   const { colors } = useTheme();
+  const tabBarInset = useTabBarBottomInset();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [events, setEvents] = useState<ElevaticsEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +116,11 @@ export const AlertsScreen: React.FC = () => {
                     <Text style={styles.criticalCount}>{alertCount}</Text>
                   </View>
                 )}
-                <Pressable style={styles.filterBtn}>
+                <Pressable
+                  style={styles.filterBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Filter alerts"
+                >
                   <Filter size={16} color={colors.text.secondary} strokeWidth={1.8} />
                 </Pressable>
               </>
@@ -149,7 +156,7 @@ export const AlertsScreen: React.FC = () => {
             </Animated.View>
           )}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: tabBarInset }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -163,15 +170,15 @@ export const AlertsScreen: React.FC = () => {
                 {[1, 2, 3, 4, 5].map(i => <EventSkeleton key={i} colors={colors} />)}
               </View>
             ) : (
-              <View style={styles.empty}>
-                <Bell size={40} color={colors.text.tertiary} strokeWidth={1.5} />
-                <Text style={styles.emptyTitle}>No events found</Text>
-                <Text style={styles.emptySubtitle}>
-                  {activeFilter === 'all'
+              <EmptyState
+                icon={<Bell size={28} color={colors.text.tertiary} strokeWidth={1.5} />}
+                title="No events found"
+                subtitle={
+                  activeFilter === 'all'
                     ? 'Live events will appear here as your fleet reports them'
-                    : 'No events match this filter in the last 24h'}
-                </Text>
-              </View>
+                    : 'No events match this filter in the last 24h'
+                }
+              />
             )
           }
         />
@@ -297,15 +304,6 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
   filterWrap: { marginBottom: 8 },
-  listContent: { paddingBottom: 120 },
+  listContent: {},
   skeletonList: {},
-  empty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 40,
-    gap: 12,
-  },
-  emptyTitle: { ...typography.bodyMd, color: colors.text.secondary },
-  emptySubtitle: { ...typography.caption, color: colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
 });

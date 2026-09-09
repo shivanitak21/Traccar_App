@@ -12,13 +12,14 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Shield, User, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 import { elevaticsAPI, ElevaticsDevice, ElevaticsPermission, ElevaticsUser } from '../api/elevatics';
 
 export const UserAccessScreen: React.FC = () => {
@@ -94,8 +95,7 @@ export const UserAccessScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -173,7 +173,7 @@ export const UserAccessScreen: React.FC = () => {
               </GlassCard>
             );
           })}
-          {!loading && users.length === 0 && <Text style={styles.empty}>No users yet. Tap + to add one.</Text>}
+          {!loading && users.length === 0 && (<EmptyState icon={<User size={28} color={colors.text.tertiary} strokeWidth={1.5} />} title="No users yet" subtitle="Tap + to add a user" actionLabel="Add user" onAction={openCreate} />)}
         </ScrollView>
       </SafeAreaView>
 
@@ -191,7 +191,7 @@ export const UserAccessScreen: React.FC = () => {
           </GlassCard>
         </View>
       </Modal>
-    </View>
+    </ScreenBackground>
   );
 };
 
@@ -223,7 +223,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   deleteBtn: { marginTop: 12, paddingVertical: 10, alignItems: 'center' },
   deleteText: { ...typography.body, color: colors.error, fontWeight: '600' },
   empty: { ...typography.body, color: colors.text.tertiary, textAlign: 'center', marginTop: 40 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: { margin: 16, padding: 20, borderRadius: 16 },
   modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: 16 },
   input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },

@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Text,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Dimensions,
   Alert,
   Modal,
@@ -274,16 +274,16 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     return (
       <View style={styles.container}>
         {onClose && (
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Pressable style={styles.closeButton} onPress={onClose}>
             <X color={colors.text.primary} size={24} />
-          </TouchableOpacity>
+          </Pressable>
         )}
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>No route data available</Text>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
+          <Pressable style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
             <Filter color={colors.primary} size={20} />
             <Text style={styles.filterButtonText}>Change Time Range</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     );
@@ -292,9 +292,9 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   return (
     <View style={styles.container}>
       {onClose && (
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Pressable style={styles.closeButton} onPress={onClose}>
           <X color={colors.text.primary} size={24} />
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       <WebMapView
@@ -316,13 +316,13 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
       )}
 
       {/* Filter button - positioned to not overlap close button */}
-      <TouchableOpacity
+      <Pressable
         style={styles.filterButtonTop}
         onPress={() => setShowFilterModal(true)}
       >
         <Calendar color={colors.text.primary} size={18} />
         <Text style={styles.filterButtonText}>{getFilterLabel(timeFilter)}</Text>
-      </TouchableOpacity>
+      </Pressable>
 
       <View style={styles.controlsContainer}>
         <GlassCard style={styles.controlsCard}>
@@ -366,21 +366,21 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           </View>
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.controlButton} onPress={handleSkipBackward}>
+            <Pressable style={styles.controlButton} onPress={handleSkipBackward}>
               <SkipBack color={colors.text.primary} size={24} />
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
+            <Pressable style={styles.playButton} onPress={handlePlayPause}>
               {isPlaying ? (
                 <Pause color={colors.text.primary} size={32} />
               ) : (
                 <Play color={colors.text.primary} size={32} />
               )}
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.controlButton} onPress={handleSkipForward}>
+            <Pressable style={styles.controlButton} onPress={handleSkipForward}>
               <SkipForward color={colors.text.primary} size={24} />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </GlassCard>
       </View>
@@ -395,14 +395,14 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Time Range</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+              <Pressable onPress={() => setShowFilterModal(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.filterOptions}>
               {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
-                <TouchableOpacity
+                <Pressable
                   key={filter}
                   style={[
                     styles.filterOption,
@@ -418,7 +418,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
                   >
                     {getFilterLabel(filter)}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           </GlassCard>
@@ -435,51 +435,51 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Custom Date Range</Text>
-              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+              <Pressable onPress={() => setShowCustomDatePicker(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.datePickerContainer}>
               <Text style={styles.dateLabel}>From Date & Time</Text>
               <View style={styles.dateRow}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.dateButton}
                   onPress={() => setShowFromDatePicker(true)}
                 >
                   <Calendar color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </Pressable>
+                <Pressable
                   style={styles.timeButton}
                   onPress={() => setShowFromTimePicker(true)}
                 >
                   <Clock color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
               <View style={styles.dateRow}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.dateButton}
                   onPress={() => setShowToDatePicker(true)}
                 >
                   <Calendar color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </Pressable>
+                <Pressable
                   style={styles.timeButton}
                   onPress={() => setShowToTimePicker(true)}
                 >
                   <Clock color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
-              <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+              <Pressable style={styles.applyButton} onPress={handleCustomDateApply}>
                 <Text style={styles.applyButtonText}>Apply</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             {showFromDatePicker && (

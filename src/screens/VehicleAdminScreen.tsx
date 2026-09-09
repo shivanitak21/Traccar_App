@@ -11,13 +11,15 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, Navigation, Pencil } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingState } from '../components/ui/LoadingState';
 import { elevaticsAPI, ElevaticsDevice } from '../api/elevatics';
 
 export const VehicleAdminScreen: React.FC = () => {
@@ -77,15 +79,14 @@ export const VehicleAdminScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={colors.gradient.dark} style={StyleSheet.absoluteFill} />
+    <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
             <ArrowLeft size={22} color={colors.text.primary} />
           </Pressable>
-          <Text style={styles.title}>Manage Vehicles</Text>
-          <Pressable onPress={openCreate} style={styles.addBtn}>
+          <Text style={styles.title} accessibilityRole="header">Manage Vehicles</Text>
+          <Pressable onPress={openCreate} style={styles.addBtn} accessibilityRole="button" accessibilityLabel="Add vehicle">
             <Plus size={20} color={colors.primary} />
           </Pressable>
         </View>
@@ -94,6 +95,7 @@ export const VehicleAdminScreen: React.FC = () => {
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDevices} tintColor={colors.primary} />}
         >
+          {loading && devices.length === 0 ? <LoadingState label="Loading vehicles…" /> : null}
           {devices.map(device => (
             <GlassCard key={device.id} style={styles.card}>
               <View style={styles.cardHeader}>
@@ -104,16 +106,24 @@ export const VehicleAdminScreen: React.FC = () => {
                   <Text style={styles.deviceName}>{device.name}</Text>
                   <Text style={styles.deviceMeta}>{device.uniqueId}{device.model ? ` • ${device.model}` : ''}</Text>
                 </View>
-                <Pressable onPress={() => openEdit(device)} hitSlop={8} style={styles.actionBtn}>
+                <Pressable onPress={() => openEdit(device)} hitSlop={8} style={styles.actionBtn} accessibilityLabel={`Edit ${device.name}`}>
                   <Pencil size={16} color={colors.text.secondary} />
                 </Pressable>
-                <Pressable onPress={() => deleteDevice(device)} hitSlop={8}>
+                <Pressable onPress={() => deleteDevice(device)} hitSlop={8} accessibilityLabel={`Delete ${device.name}`}>
                   <Trash2 size={16} color={colors.error} />
                 </Pressable>
               </View>
             </GlassCard>
           ))}
-          {!loading && devices.length === 0 && <Text style={styles.empty}>No vehicles yet. Tap + to add one.</Text>}
+          {!loading && devices.length === 0 && (
+            <EmptyState
+              icon={<Navigation size={28} color={colors.text.tertiary} strokeWidth={1.5} />}
+              title="No vehicles yet"
+              subtitle="Tap + to add a vehicle"
+              actionLabel="Add vehicle"
+              onAction={openCreate}
+            />
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -133,17 +143,16 @@ export const VehicleAdminScreen: React.FC = () => {
           </GlassCard>
         </View>
       </Modal>
-    </View>
+    </ScreenBackground>
   );
 };
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { padding: 8, marginRight: 8 },
+  backBtn: { padding: 8, marginRight: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { ...typography.h2, color: colors.text.primary, flex: 1 },
-  addBtn: { padding: 8 },
+  addBtn: { padding: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
   card: { padding: 14 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -151,11 +160,10 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   cardInfo: { flex: 1 },
   deviceName: { ...typography.bodyMd, color: colors.text.primary, fontWeight: '600' },
   deviceMeta: { ...typography.small, color: colors.text.tertiary, marginTop: 2 },
-  actionBtn: { marginRight: 4 },
-  empty: { ...typography.body, color: colors.text.tertiary, textAlign: 'center', marginTop: 40 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  actionBtn: { marginRight: 4, minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: { margin: 16, padding: 20, borderRadius: 16 },
   modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary },
+  input: { borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, padding: 12, color: colors.text.primary, marginBottom: 10, backgroundColor: colors.backgroundSecondary, minHeight: 48 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
 });
