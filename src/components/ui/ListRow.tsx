@@ -14,6 +14,8 @@ interface ListRowProps {
   onPress?: () => void;
   showChevron?: boolean;
   danger?: boolean;
+  grouped?: boolean;
+  divider?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
 }
@@ -26,15 +28,22 @@ export const ListRow: React.FC<ListRowProps> = ({
   onPress,
   showChevron = !!onPress,
   danger,
+  grouped = false,
+  divider = false,
   style,
   accessibilityLabel,
 }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const rowStyle = [
+    grouped ? styles.groupedRow : styles.row,
+    divider && styles.divider,
+    style,
+  ];
 
   const content = (
     <>
-      {left ? <View style={styles.left}>{left}</View> : null}
+      {left ? <View style={grouped ? styles.leftPlain : styles.left}>{left}</View> : null}
       <View style={styles.textBlock}>
         <Text style={[styles.title, danger && { color: colors.error }]} numberOfLines={1}>
           {title}
@@ -58,14 +67,14 @@ export const ListRow: React.FC<ListRowProps> = ({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? title}
-        style={({ pressed }) => [styles.row, pressed && styles.pressed, style]}
+        style={({ pressed }) => [rowStyle, pressed && styles.pressed]}
       >
         {content}
       </Pressable>
     );
   }
 
-  return <View style={[styles.row, style]}>{content}</View>;
+  return <View style={rowStyle}>{content}</View>;
 };
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
@@ -82,9 +91,27 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       borderWidth: 1,
       borderColor: colors.border.subtle,
     },
+    groupedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 52,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      gap: 12,
+      backgroundColor: 'transparent',
+    },
+    divider: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border.subtle,
+    },
     pressed: {
       opacity: 0.75,
       backgroundColor: colors.surfaceElevated,
+    },
+    leftPlain: {
+      width: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     left: {
       width: 40,
@@ -96,6 +123,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     textBlock: {
       flex: 1,
+      minWidth: 0,
       gap: 2,
     },
     title: {
@@ -108,5 +136,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     right: {
       marginLeft: spacing.xs,
+      flexShrink: 1,
+      maxWidth: '50%',
     },
   });

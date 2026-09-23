@@ -40,7 +40,7 @@ export const ReportChart: React.FC<ReportChartProps> = ({
 }) => {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const viewportWidth = Math.max(260, screenWidth - 80);
+  const viewportWidth = Math.max(160, screenWidth - 88);
   const accent = color ?? colors.chart[0];
   const pointSpacing = type === 'bar' ? BAR_SPACING : LINE_SPACING;
 
@@ -70,9 +70,9 @@ export const ReportChart: React.FC<ReportChartProps> = ({
   }, [labels.length, values, viewportWidth, height, pointSpacing]);
 
   const styles = useMemo(() => StyleSheet.create({
-    card: { padding: 16, marginBottom: 12, gap: 4 },
-    title: { ...typography.captionMd, color: colors.text.primary, fontWeight: '600' },
-    subtitle: { ...typography.tiny, color: colors.text.tertiary },
+    card: { padding: 16, marginBottom: 16, gap: 4, borderRadius: 16 },
+    title: { ...typography.h4, color: colors.text.primary },
+    subtitle: { ...typography.caption, color: colors.text.tertiary, marginBottom: 4 },
     chartRow: { flexDirection: 'row', marginTop: 4 },
     yAxis: {
       width: Y_AXIS_WIDTH,

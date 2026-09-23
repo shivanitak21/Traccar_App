@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Platform, StyleSheet } from 'react-native';
+import { View, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -13,7 +13,6 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { typography } from '../../src/theme/typography';
-import { radius } from '../../src/theme/radius';
 import { TAB_BAR_HEIGHT, TAB_BAR_FLOAT_GAP } from '../../src/utils/tabBarInset';
 
 export default function TabLayout() {
@@ -21,9 +20,11 @@ export default function TabLayout() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const hasHydrated = useAuthStore(state => state.hasHydrated);
   const { colors, isDark } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const sideInset = windowWidth < 360 ? 8 : 16;
+  const labelSize = windowWidth < 360 ? 9 : 10;
 
   const tabBarBottom = insets.bottom + TAB_BAR_FLOAT_GAP;
-  const tabBarPaddingBottom = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 10;
 
   if (!hasHydrated) {
     return null;
@@ -33,12 +34,6 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
-  const focusedIconStyle = {
-    backgroundColor: colors.accentMuted,
-    borderRadius: radius.md,
-    padding: 5,
-  };
-
   return (
     <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
       <Tabs
@@ -47,31 +42,34 @@ export default function TabLayout() {
           tabBarStyle: {
             position: 'absolute',
             bottom: tabBarBottom,
-            left: 16,
-            right: 16,
+            left: sideInset,
+            right: sideInset,
             height: TAB_BAR_HEIGHT,
             backgroundColor: 'transparent',
             borderTopWidth: 0,
             elevation: 28,
-            paddingTop: 8,
-            paddingBottom: tabBarPaddingBottom,
-            borderRadius: radius['2xl'],
+            paddingTop: 6,
+            paddingBottom: 8,
+            borderRadius: 20,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 10 },
             shadowOpacity: isDark ? 0.75 : 0.20,
             shadowRadius: 28,
           },
-          tabBarActiveTintColor: colors.tabBar.active,
+          tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.tabBar.inactive,
+          safeAreaInsets: { bottom: 0 },
           tabBarLabelStyle: {
             ...typography.tabLabel,
-            marginTop: 4,
+            fontSize: labelSize,
+            marginTop: 2,
           },
           tabBarItemStyle: {
             gap: 2,
+            paddingHorizontal: 0,
           },
           tabBarBackground: () => (
-            <View style={[StyleSheet.absoluteFill, { borderRadius: radius['2xl'], overflow: 'hidden', borderWidth: 1, borderColor: colors.border.strong }]}>
+            <View style={[StyleSheet.absoluteFill, { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.border.strong }]}>
               {Platform.OS === 'ios' ? (
                 <BlurView
                   intensity={96}
@@ -81,7 +79,6 @@ export default function TabLayout() {
               ) : (
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(18, 18, 20, 0.97)' : 'rgba(255,255,255,0.97)' }]} />
               )}
-              <View style={[styles.tabBarTopAccent, { backgroundColor: colors.border.focus }]} />
             </View>
           ),
         }}
@@ -91,9 +88,7 @@ export default function TabLayout() {
           options={{
             title: 'Home',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? focusedIconStyle : undefined}>
-                <LayoutDashboard size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-              </View>
+              <LayoutDashboard size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
             ),
           }}
         />
@@ -102,9 +97,7 @@ export default function TabLayout() {
           options={{
             title: 'Vehicles',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? focusedIconStyle : undefined}>
-                <Navigation size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-              </View>
+              <Navigation size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
             ),
           }}
         />
@@ -113,9 +106,7 @@ export default function TabLayout() {
           options={{
             title: 'Map',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? focusedIconStyle : undefined}>
-                <Map size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-              </View>
+              <Map size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
             ),
           }}
         />
@@ -130,9 +121,7 @@ export default function TabLayout() {
           options={{
             title: 'Reports',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? focusedIconStyle : undefined}>
-                <BarChart3 size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-              </View>
+              <BarChart3 size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
             ),
           }}
         />
@@ -141,9 +130,7 @@ export default function TabLayout() {
           options={{
             title: 'Settings',
             tabBarIcon: ({ size, color, focused }) => (
-              <View style={focused ? focusedIconStyle : undefined}>
-                <Settings size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-              </View>
+              <Settings size={size - 2} color={color} strokeWidth={focused ? 2.2 : 1.8} />
             ),
           }}
         />
@@ -155,13 +142,5 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-  },
-  tabBarTopAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 24,
-    right: 24,
-    height: 1,
-    borderRadius: 1,
   },
 });

@@ -7,10 +7,10 @@ import {
   Pressable,
   Alert,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   MapPin,
   Route,
@@ -22,10 +22,11 @@ import {
   Fuel,
   TrendingUp,
   BarChart3,
-  Play,
-  Gauge,
   AlertTriangle,
   ChevronDown,
+  ChevronLeft,
+  Check,
+  Sparkles,
 } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
@@ -125,6 +126,10 @@ function getDateRange(range: string): { from: string; to: string } {
 export const ReportsScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const tabBarInset = useTabBarBottomInset(24);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isWide = windowWidth >= 700;
+  const screenPad = windowWidth < 360 ? 16 : spacing.screenPadding;
+  const mapHeight = Math.round(Math.min(Math.max(windowHeight * 0.32, 200), 340));
   const { devices, setDevices } = useFleetStore();
   const { prefs } = usePrefsStore();
   const [reportType, setReportType] = useState<ReportType>('route');
@@ -138,6 +143,7 @@ export const ReportsScreen: React.FC = () => {
   const [routePositions, setRoutePositions] = useState<ElevaticsPosition[]>([]);
   const [page, setPage] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -169,6 +175,7 @@ export const ReportsScreen: React.FC = () => {
 
     setLoading(true);
     setHasLoaded(false);
+    setShowResults(false);
     setError(null);
     setTrips([]);
     setSummary([]);
@@ -212,11 +219,13 @@ export const ReportsScreen: React.FC = () => {
         }
       }
       setHasLoaded(true);
+      setShowResults(true);
     } catch (err: any) {
       const msg = sanitizeBrandText(err?.message || 'Failed to generate report');
       console.error('Report error:', err);
       setError(msg);
       setHasLoaded(true);
+      setShowResults(false);
     } finally {
       setLoading(false);
     }
@@ -299,7 +308,7 @@ export const ReportsScreen: React.FC = () => {
   const styles = useMemo(() => StyleSheet.create({
     safeArea: { flex: 1 },
     scrollContent: {
-      paddingHorizontal: spacing.screenPadding,
+      paddingHorizontal: screenPad,
       paddingBottom: tabBarInset,
     },
     section: { marginBottom: 28 },
@@ -307,35 +316,36 @@ export const ReportsScreen: React.FC = () => {
       ...typography.sectionLabel,
       color: colors.text.tertiary,
       marginBottom: 12,
+      letterSpacing: 0.6,
     },
     reportTypeGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
+      marginHorizontal: -5,
+    },
+    reportTypeSlot: {
+      width: isWide ? '33.333%' : '50%',
+      padding: 5,
     },
     reportTypeCard: {
-      width: '47%',
+      minHeight: 72,
       backgroundColor: colors.surface,
-      borderRadius: radius.card,
-      padding: 16,
-      borderWidth: 1,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 14,
+      borderWidth: 1.5,
       borderColor: colors.border.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 10,
     },
     reportTypeCardActive: {
-      borderColor: colors.border.strong,
-      backgroundColor: colors.surfaceElevated,
-    },
-    reportTypeIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryMuted,
     },
     reportTypeLabel: {
       ...typography.captionMd,
-      color: colors.text.primary,
+      color: colors.text.secondary,
     },
     reportTypeDesc: {
       ...typography.tiny,
@@ -358,12 +368,14 @@ export const ReportsScreen: React.FC = () => {
       marginRight: 8,
     },
     vehicleChipActive: {
-      backgroundColor: colors.accent,
-      borderColor: colors.accent,
+      backgroundColor: colors.primaryMuted,
+      borderColor: colors.primary,
     },
     vehicleChipText: {
       ...typography.captionMd,
       color: colors.text.tertiary,
+      flexShrink: 1,
+      maxWidth: Math.min(220, Math.max(96, windowWidth * 0.55)),
     },
     dateRangeRow: {
       flexDirection: 'row',
@@ -387,16 +399,16 @@ export const ReportsScreen: React.FC = () => {
       color: colors.text.tertiary,
     },
     runSection: {
-      alignItems: 'center',
+      alignItems: 'stretch',
     },
     runButton: {
-      alignSelf: 'center',
+      alignSelf: 'stretch',
       borderRadius: 14,
       overflow: 'hidden',
+      backgroundColor: colors.primary,
     },
-    runGradient: {
-      height: 48,
-      paddingHorizontal: 28,
+    runFill: {
+      height: 52,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -453,12 +465,49 @@ export const ReportsScreen: React.FC = () => {
     },
     metricHalf: { width: '47%' },
     mapContainer: {
-      height: 220,
-      borderRadius: radius.card,
+      height: mapHeight,
+      borderRadius: 16,
       overflow: 'hidden',
-      marginBottom: 12,
+      marginBottom: 16,
       borderWidth: 1,
       borderColor: colors.border.subtle,
+    },
+    backRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingTop: 8,
+      paddingBottom: 12,
+      alignSelf: 'flex-start',
+    },
+    backText: {
+      ...typography.captionMd,
+      color: colors.text.secondary,
+    },
+    resultTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 18,
+    },
+    resultTitle: {
+      ...typography.h2,
+      color: colors.text.primary,
+      flex: 1,
+    },
+    countBadge: {
+      backgroundColor: colors.primaryMuted,
+      borderRadius: radius.pill,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      flexShrink: 0,
+      maxWidth: '46%',
+    },
+    countBadgeText: {
+      ...typography.captionMd,
+      color: colors.primary,
+      fontWeight: '600',
     },
     loadMoreBtn: {
       alignItems: 'center',
@@ -482,7 +531,7 @@ export const ReportsScreen: React.FC = () => {
       fontWeight: '600',
       marginBottom: 8,
     },
-  }), [colors, tabBarInset]);
+  }), [colors, tabBarInset, screenPad, isWide, windowWidth, mapHeight]);
 
   return (
     <ScreenBackground>
@@ -491,49 +540,51 @@ export const ReportsScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {!showResults && (
+          <>
           <Animated.View entering={FadeInDown.delay(0).duration(450)}>
             <ScreenHeader
               title="Reports"
               subtitle="Fleet performance & activity"
-              large={false}
             />
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(60).duration(450)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Report Type</Text>
+            <Text style={styles.sectionLabel}>Filters</Text>
             <View style={styles.reportTypeGrid}>
-              {REPORT_TYPES.map(rt => (
-                <Pressable
-                  key={rt.key}
-                  onPress={() => setReportType(rt.key)}
-                  style={[
-                    styles.reportTypeCard,
-                    reportType === rt.key && styles.reportTypeCardActive,
-                  ]}
-                >
-                  <View style={[
-                    styles.reportTypeIcon,
-                    {
-                      backgroundColor: reportType === rt.key
-                        ? colors.accentMuted
-                        : colors.backgroundSecondary,
-                    },
-                  ]}>
-                    <rt.icon
-                      size={20}
-                      color={reportType === rt.key ? colors.text.primary : colors.text.tertiary}
-                      strokeWidth={1.8}
-                    />
-                  </View>
-                  <Text style={[
-                    styles.reportTypeLabel,
-                    reportType === rt.key && { color: colors.text.primary },
-                  ]}>
-                    {rt.label}
-                  </Text>
-                  <Text style={styles.reportTypeDesc}>{rt.desc}</Text>
-                </Pressable>
-              ))}
+              {REPORT_TYPES.map(rt => {
+                const active = reportType === rt.key;
+                return (
+                  <Pressable
+                    key={rt.key}
+                    onPress={() => setReportType(rt.key)}
+                    style={styles.reportTypeSlot}
+                  >
+                    <View style={[
+                      styles.reportTypeCard,
+                      active && styles.reportTypeCardActive,
+                    ]}>
+                      <rt.icon
+                        size={18}
+                        color={active ? colors.primary : colors.text.tertiary}
+                        strokeWidth={1.8}
+                      />
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text
+                          numberOfLines={2}
+                          style={[
+                            styles.reportTypeLabel,
+                            active && { color: colors.text.primary },
+                          ]}
+                        >
+                          {rt.label}
+                        </Text>
+                        <Text style={styles.reportTypeDesc} numberOfLines={3}>{rt.desc}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           </Animated.View>
 
@@ -544,35 +595,41 @@ export const ReportsScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.vehicleList}
             >
-              {devices.map(device => (
-                <Pressable
-                  key={device.id}
-                  onPress={() => setSelectedDeviceId(device.id)}
-                  style={[
-                    styles.vehicleChip,
-                    selectedDeviceId === device.id && styles.vehicleChipActive,
-                  ]}
-                >
-                  <Navigation
-                    size={14}
-                    color={selectedDeviceId === device.id ? colors.text.inverse : colors.text.tertiary}
-                    strokeWidth={1.8}
-                  />
-                  <Text style={[
-                    styles.vehicleChipText,
-                    selectedDeviceId === device.id && { color: colors.text.inverse },
-                  ]}>
-                    {device.name}
-                  </Text>
-                </Pressable>
-              ))}
+              {devices.map(device => {
+                const active = selectedDeviceId === device.id;
+                return (
+                  <Pressable
+                    key={device.id}
+                    onPress={() => setSelectedDeviceId(device.id)}
+                    style={[
+                      styles.vehicleChip,
+                      active && styles.vehicleChipActive,
+                    ]}
+                  >
+                    {active ? (
+                      <Check size={14} color={colors.primary} strokeWidth={2.4} />
+                    ) : (
+                      <Navigation size={14} color={colors.text.tertiary} strokeWidth={1.8} />
+                    )}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.vehicleChipText,
+                        active && { color: colors.text.primary },
+                      ]}
+                    >
+                      {device.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
               {devices.length === 0 && (
                 <Text style={styles.noDevicesHint}>No vehicles loaded yet...</Text>
               )}
             </ScrollView>
           </Animated.View>
 
-          {error && (
+          {error && !showResults && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
@@ -611,39 +668,59 @@ export const ReportsScreen: React.FC = () => {
                 (loading || !selectedDeviceId) && styles.runButtonDisabled,
               ]}
             >
-              <LinearGradient
-                colors={colors.gradient.brand}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.runGradient}
-              >
+              <View style={styles.runFill}>
                 {loading ? (
                   <Text style={styles.runText}>Generating...</Text>
                 ) : (
                   <View style={styles.runContent}>
-                    <Play size={16} color="#FFFFFF" strokeWidth={2.5} />
+                    <Sparkles size={16} color="#FFFFFF" strokeWidth={2.2} />
                     <Text style={styles.runText}>Generate Report</Text>
                   </View>
                 )}
-              </LinearGradient>
+              </View>
             </Pressable>
           </Animated.View>
+          </>
+          )}
 
-          {hasLoaded && (
+          {showResults && hasLoaded && (
             <Animated.View entering={FadeIn.duration(400)} style={styles.section}>
-              <View style={styles.resultsHeader}>
-                <Text style={styles.sectionLabel}>Results</Text>
+              <Pressable
+                onPress={() => setShowResults(false)}
+                style={styles.backRow}
+                accessibilityRole="button"
+                accessibilityLabel="Back to filters"
+              >
+                <ChevronLeft size={18} color={colors.text.secondary} strokeWidth={2} />
+                <Text style={styles.backText}>Back to filters</Text>
+              </Pressable>
+              <View style={styles.resultTitleRow}>
+                <Text style={styles.resultTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {reportType === 'route' ? 'Trip Log'
+                    : reportType === 'trips' ? 'Trip Report'
+                    : reportType === 'summary' ? 'Fleet Summary'
+                    : reportType === 'stops' ? 'Stop Report'
+                    : 'Event Report'}
+                </Text>
                 {reportType === 'route' && routePositions.length > 0 && (
-                  <Text style={styles.resultCount}>{routePositions.length} points</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText} numberOfLines={1}>{routePositions.length} points</Text>
+                  </View>
                 )}
                 {reportType === 'trips' && trips.length > 0 && (
-                  <Text style={styles.resultCount}>{trips.length} trips</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>{trips.length} trips</Text>
+                  </View>
                 )}
                 {reportType === 'stops' && stops.length > 0 && (
-                  <Text style={styles.resultCount}>{stops.length} stops</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>{stops.length} stops</Text>
+                  </View>
                 )}
                 {reportType === 'events' && events.length > 0 && (
-                  <Text style={styles.resultCount}>{events.length} events</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>{events.length} events</Text>
+                  </View>
                 )}
               </View>
 
@@ -884,6 +961,8 @@ const RouteOverview: React.FC<{
   prefs: ReturnType<typeof usePrefsStore.getState>['prefs'];
 }> = ({ positions, prefs }) => {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const stacked = width < 400;
   const maxSpeed = Math.max(...positions.map(p => p.speed || 0));
   const avgSpeed = positions.reduce((s, p) => s + (p.speed || 0), 0) / Math.max(positions.length, 1);
   const start = positions[0];
@@ -892,40 +971,36 @@ const RouteOverview: React.FC<{
     ? (new Date(end.fixTime).getTime() - new Date(start.fixTime).getTime()) / 1000
     : 0;
 
+  const stats = [
+    { label: 'GPS Points', value: String(positions.length) },
+    { label: 'Duration', value: formatDuration(spanSec) },
+    { label: 'Avg Speed', value: formatSpeed(avgSpeed, prefs.speedUnit) },
+    { label: 'Max Speed', value: formatSpeed(maxSpeed, prefs.speedUnit) },
+  ];
+
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-      <MetricCard
-        style={{ width: '47%' }}
-        size="sm"
-        label="GPS Points"
-        value={positions.length}
-        icon={<MapPin size={18} color={colors.primary} strokeWidth={1.8} />}
-        accent={colors.primary}
-      />
-      <MetricCard
-        style={{ width: '47%' }}
-        size="sm"
-        label="Duration"
-        value={formatDuration(spanSec)}
-        icon={<Clock size={18} color={colors.blue} strokeWidth={1.8} />}
-        accent={colors.blue}
-      />
-      <MetricCard
-        style={{ width: '47%' }}
-        size="sm"
-        label="Avg Speed"
-        value={formatSpeed(avgSpeed, prefs.speedUnit)}
-        icon={<Gauge size={18} color={colors.success} strokeWidth={1.8} />}
-        accent={colors.success}
-      />
-      <MetricCard
-        style={{ width: '47%' }}
-        size="sm"
-        label="Max Speed"
-        value={formatSpeed(maxSpeed, prefs.speedUnit)}
-        icon={<TrendingUp size={18} color={colors.warning} strokeWidth={1.8} />}
-        accent={colors.warning}
-      />
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
+      {stats.map(stat => (
+        <View
+          key={stat.label}
+          style={{
+            width: stacked ? '50%' : '25%',
+            gap: 4,
+            paddingRight: 8,
+            marginBottom: stacked ? 12 : 0,
+          }}
+        >
+          <Text
+            style={{ ...typography.metricSm, fontSize: stacked ? 20 : 22, lineHeight: stacked ? 24 : 26, color: colors.text.primary }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
+            {stat.value}
+          </Text>
+          <Text style={{ ...typography.tiny, color: colors.text.tertiary }} numberOfLines={1}>{stat.label}</Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -940,12 +1015,14 @@ const RouteHighlights: React.FC<{
   const peak = positions.reduce((best, p) => ((p.speed || 0) > (best.speed || 0) ? p : best), positions[0]);
 
   const styles = useMemo(() => StyleSheet.create({
-    card: { padding: 14, marginBottom: 8, gap: 10 },
-    title: { ...typography.captionMd, color: colors.text.primary, fontWeight: '600' },
-    row: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+    card: { padding: 16, marginBottom: 8, gap: 4, borderRadius: 16 },
+    title: { ...typography.h4, color: colors.text.primary, marginBottom: 8 },
+    row: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
+    rail: { width: 14, alignItems: 'center' },
     dot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-    info: { flex: 1, gap: 2 },
-    label: { ...typography.tiny, color: colors.text.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    line: { width: 2, flex: 1, backgroundColor: colors.border.default, marginTop: 4, marginBottom: -4 },
+    info: { flex: 1, gap: 2, paddingBottom: 14 },
+    label: { ...typography.captionMd, color: colors.text.primary, fontWeight: '600' },
     time: { ...typography.smallMd, color: colors.text.secondary, fontVariant: ['tabular-nums'] },
     detail: { ...typography.small, color: colors.text.tertiary },
   }), [colors]);
@@ -959,9 +1036,12 @@ const RouteHighlights: React.FC<{
   return (
     <GlassCard style={styles.card}>
       <Text style={styles.title}>Route Highlights</Text>
-      {items.map(item => (
+      {items.map((item, index) => (
         <View key={item.label} style={styles.row}>
-          <View style={[styles.dot, { backgroundColor: item.color }]} />
+          <View style={styles.rail}>
+            <View style={[styles.dot, { backgroundColor: item.color }]} />
+            {index < items.length - 1 ? <View style={styles.line} /> : null}
+          </View>
           <View style={styles.info}>
             <Text style={styles.label}>{item.label}</Text>
             <Text style={styles.time}>{new Date(item.position.fixTime).toLocaleString()}</Text>

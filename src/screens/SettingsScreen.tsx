@@ -8,6 +8,7 @@ import {
   Pressable,
   Switch,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -39,7 +40,6 @@ import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
-import { GlassCard } from '../components/GlassCard';
 import { ScreenBackground } from '../components/ui/ScreenBackground';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { ListRow } from '../components/ui/ListRow';
@@ -59,7 +59,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const { prefs, initialize: initPrefs, setPref, savePrefs } = usePrefsStore();
   const { colors, themeMode, setThemeMode } = useTheme();
   const tabBarInset = useTabBarBottomInset();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width: windowWidth } = useWindowDimensions();
+  const screenPad = windowWidth < 360 ? 16 : spacing.screenPadding;
+  const styles = useMemo(() => makeStyles(colors, screenPad), [colors, screenPad]);
   const [wsConnected, setWsConnected] = useState(elevaticsWS.isConnected);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [savingPrefs, setSavingPrefs] = useState(false);
@@ -128,12 +130,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     </Text>
   );
 
-  const iconLeft = (icon: React.ReactNode, accent?: string) => (
-    <View style={[styles.iconWrap, { backgroundColor: accent ? `${accent}14` : colors.backgroundSecondary }]}>
-      {icon}
-    </View>
-  );
-
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -146,14 +142,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(60).duration(500)}>
-            <GlassCard variant="elevated" style={styles.profileCard}>
+            <View style={styles.profileCard}>
               <View style={styles.profileRow}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initials}</Text>
                 </View>
                 <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>{user?.name || 'Administrator'}</Text>
-                  <Text style={styles.profileEmail}>{user?.email || ''}</Text>
+                  <Text style={styles.profileName} numberOfLines={1}>{user?.name || 'Administrator'}</Text>
+                  <Text style={styles.profileEmail} numberOfLines={1}>{user?.email || ''}</Text>
                   {user?.administrator && (
                     <View style={styles.adminBadge}>
                       <Shield size={10} color={colors.primary} strokeWidth={2} />
@@ -165,25 +161,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                   <ChevronRight size={18} color={colors.text.tertiary} strokeWidth={1.8} />
                 </Pressable>
               </View>
-            </GlassCard>
+            </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(120).duration(500)}>
             <SectionLabel title="Connection" colors={colors} />
-            <View style={styles.rowStack}>
+            <View style={styles.group}>
               <ListRow
+                grouped
+                divider
                 title="Server URL"
-                left={iconLeft(<Server size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                left={<Server size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(serverUrl || '')}
                 showChevron={false}
-                style={styles.listRow}
               />
               <ListRow
+                grouped
                 title="Live connection"
-                left={iconLeft(
-                  <Wifi size={18} color={wsConnected ? colors.success : colors.text.tertiary} strokeWidth={1.8} />,
-                  wsConnected ? colors.success : colors.error,
-                )}
+                left={<Wifi size={18} color={wsConnected ? colors.success : colors.text.tertiary} strokeWidth={1.8} />}
                 right={
                   <View style={styles.rightCluster}>
                     {rowRight(wsConnected ? 'Connected' : 'Disconnected', wsConnected ? colors.success : colors.error)}
@@ -192,55 +187,59 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 }
                 onPress={handleReconnectWS}
                 accessibilityLabel="Reconnect live connection"
-                style={styles.listRow}
               />
             </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(150).duration(500)}>
             <SectionLabel title="Appearance" colors={colors} />
-            <View style={styles.rowStack}>
+            <View style={styles.group}>
               <ListRow
+                grouped
                 title="Theme"
-                left={iconLeft(<ThemeIcon size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                left={<ThemeIcon size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(themeLabel)}
                 onPress={cycleTheme}
                 accessibilityLabel={`Theme, ${themeLabel}`}
-                style={styles.listRow}
               />
             </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(180).duration(500)}>
             <SectionLabel title="Preferences" colors={colors} />
-            <View style={styles.rowStack}>
+            <View style={styles.group}>
               <ListRow
+                grouped
+                divider
                 title="Distance unit"
-                left={iconLeft(<Ruler size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                left={<Ruler size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(prefs.distanceUnit.toUpperCase())}
                 onPress={() => cyclePref('distanceUnit', ['km', 'mi', 'nm'])}
                 accessibilityLabel="Distance unit"
-                style={styles.listRow}
               />
               <ListRow
+                grouped
+                divider
                 title="Speed unit"
-                left={iconLeft(<Gauge size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                left={<Gauge size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(prefs.speedUnit === 'kmh' ? 'KM/H' : prefs.speedUnit === 'mph' ? 'MPH' : 'KN')}
                 onPress={() => cyclePref('speedUnit', ['kmh', 'mph', 'kn'])}
                 accessibilityLabel="Speed unit"
-                style={styles.listRow}
               />
               <ListRow
+                grouped
+                divider
                 title="Fuel unit"
-                left={iconLeft(<Fuel size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                left={<Fuel size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(prefs.fuelUnit === 'liters' ? 'Liters' : prefs.fuelUnit === 'us_gallons' ? 'US Gal' : 'Imp Gal')}
                 onPress={() => cyclePref('fuelUnit', ['liters', 'us_gallons', 'imp_gallons'])}
                 accessibilityLabel="Fuel unit"
-                style={styles.listRow}
               />
               <ListRow
+                grouped
+                divider
                 title="Push notifications"
-                left={iconLeft(<Bell size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                left={<Bell size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={
                   <Switch
                     value={notificationsEnabled}
@@ -251,15 +250,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                   />
                 }
                 showChevron={false}
-                style={styles.listRow}
               />
               <ListRow
+                grouped
                 title="Save preferences"
-                left={iconLeft(<Map size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                left={<Map size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight(savingPrefs ? 'Saving...' : 'Sync to server')}
                 onPress={handleSavePrefs}
                 accessibilityLabel="Save preferences"
-                style={styles.listRow}
               />
             </View>
           </Animated.View>
@@ -267,27 +265,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           {user?.administrator && (
             <Animated.View entering={FadeInDown.delay(210).duration(500)}>
               <SectionLabel title="Administration" colors={colors} />
-              <View style={styles.rowStack}>
+              <View style={styles.group}>
                 <ListRow
+                  grouped
+                  divider
                   title="Manage vehicles"
-                  left={iconLeft(<Navigation size={18} color={colors.primary} strokeWidth={1.8} />, colors.primary)}
+                  left={<Navigation size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                   onPress={() => router.push('/admin/vehicles')}
                   accessibilityLabel="Manage vehicles"
-                  style={styles.listRow}
                 />
                 <ListRow
+                  grouped
+                  divider
                   title="Manage drivers"
-                  left={iconLeft(<User size={18} color={colors.blue} strokeWidth={1.8} />, colors.blue)}
+                  left={<User size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                   onPress={() => router.push('/admin/drivers')}
                   accessibilityLabel="Manage drivers"
-                  style={styles.listRow}
                 />
                 <ListRow
+                  grouped
                   title="User access"
-                  left={iconLeft(<Users size={18} color={colors.accent} strokeWidth={1.8} />, colors.accent)}
+                  left={<Users size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                   onPress={() => router.push('/admin/users')}
                   accessibilityLabel="User access"
-                  style={styles.listRow}
                 />
               </View>
             </Animated.View>
@@ -295,30 +295,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
           <Animated.View entering={FadeInDown.delay(240).duration(500)}>
             <SectionLabel title="App" colors={colors} />
-            <View style={styles.rowStack}>
+            <View style={styles.group}>
               <ListRow
+                grouped
+                divider
                 title="Clear cache"
-                left={iconLeft(<Database size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                left={<Database size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   Alert.alert('Cache cleared', 'Local data has been cleared.');
                 }}
                 accessibilityLabel="Clear cache"
-                style={styles.listRow}
               />
               <ListRow
+                grouped
+                divider
                 title="App version"
-                left={iconLeft(<Info size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                left={<Info size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 right={rowRight('1.0.0')}
                 showChevron={false}
-                style={styles.listRow}
               />
               <ListRow
+                grouped
                 title="Help & Support"
-                left={iconLeft(<HelpCircle size={18} color={colors.text.secondary} strokeWidth={1.8} />)}
+                left={<HelpCircle size={18} color={colors.text.secondary} strokeWidth={1.8} />}
                 onPress={() => {}}
                 accessibilityLabel="Help and support"
-                style={styles.listRow}
               />
             </View>
           </Animated.View>
@@ -343,28 +345,39 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 type ThemeColors = ReturnType<typeof useTheme>['colors'];
 
 const SectionLabel: React.FC<{ title: string; colors: ThemeColors }> = ({ title, colors }) => (
-  <Text style={{ ...typography.sectionLabel, color: colors.text.tertiary, marginBottom: 8, marginTop: 28, paddingHorizontal: 4 }}>{title}</Text>
+  <Text style={{ ...typography.sectionLabel, color: colors.text.tertiary, marginBottom: 8, marginTop: 24, paddingHorizontal: 4, letterSpacing: 0.6 }}>{title}</Text>
 );
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const makeStyles = (colors: ThemeColors, screenPad: number) => StyleSheet.create({
   safeArea: { flex: 1 },
-  scrollContent: { paddingHorizontal: spacing.screenPadding },
-  profileCard: { padding: 20, overflow: 'hidden' },
-  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  avatar: { width: 56, height: 56, borderRadius: radius.control, overflow: 'hidden', backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border.subtle, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 20, fontWeight: '700', color: colors.text.primary, letterSpacing: -0.5 },
-  profileInfo: { flex: 1, gap: 3 },
+  scrollContent: { paddingHorizontal: screenPad },
+  profileCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 18, fontWeight: '700', color: colors.text.primary, letterSpacing: -0.4 },
+  profileInfo: { flex: 1, minWidth: 0, gap: 2 },
   profileName: { ...typography.h4, color: colors.text.primary },
   profileEmail: { ...typography.caption, color: colors.text.tertiary },
-  adminBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentMuted, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start', marginTop: 2 },
-  adminText: { ...typography.tiny, color: colors.text.secondary, fontWeight: '600' },
+  adminBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryMuted, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start', marginTop: 4 },
+  adminText: { ...typography.tiny, color: colors.primary, fontWeight: '600' },
   editBtn: { padding: 4 },
-  rowStack: { gap: 8 },
-  listRow: {},
-  iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rowValue: { ...typography.caption, color: colors.text.tertiary, maxWidth: 140 },
-  rightCluster: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius.card, padding: 18, marginTop: 28, borderWidth: 1, borderColor: colors.border.alert },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    overflow: 'hidden',
+  },
+  rowValue: { ...typography.caption, color: colors.text.tertiary, flexShrink: 1 },
+  rightCluster: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginTop: 28, borderWidth: 1, borderColor: colors.border.alert },
   logoutText: { ...typography.bodyMd, color: colors.error, fontWeight: '600' },
   pressed: { opacity: 0.8 },
 });
