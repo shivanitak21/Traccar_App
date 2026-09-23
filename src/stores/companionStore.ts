@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { sanitizeBrandText } from '../utils/brandText';
 import {
   sendCompanionChat,
+  withCompanionVisuals,
   CompanionContentBlock,
 } from '../api/aiCompanion';
 import { useAuthStore } from './authStore';
@@ -178,24 +179,15 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
         threadId: threadId ?? undefined,
         userId,
         context,
-        onToken: (_token, accumulated) => {
-          const display = sanitizeBrandText(preferAddressInText(accumulated, knownAddress));
-          set(state => ({
-            messages: state.messages.map(msg =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    text: display,
-                    blocks: [{ type: 'text', content: display }],
-                  }
-                : msg
-            ),
-          }));
-        },
       });
 
       const displayText = (text: string) =>
         sanitizeBrandText(preferAddressInText(text, knownAddress));
+
+      const blocks = withCompanionVisuals(
+        result.blocks.length > 0 ? result.blocks : [{ type: 'text', content: result.rawText || 'No response received.' }],
+        `${trimmed}\n${result.rawText}`,
+      );
 
       set(state => ({
         threadId: result.threadId ?? state.threadId,
@@ -206,13 +198,11 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
                 ...msg,
                 streaming: false,
                 text: displayText(result.rawText),
-                blocks: result.blocks.length > 0
-                  ? result.blocks.map(block =>
-                      block.type === 'text'
-                        ? { ...block, content: displayText(block.content) }
-                        : block
-                    )
-                  : [{ type: 'text', content: displayText(result.rawText || 'No response received.') }],
+                blocks: blocks.map(block =>
+                  block.type === 'text'
+                    ? { ...block, content: displayText(block.content) }
+                    : block
+                ),
               }
             : msg
         ),

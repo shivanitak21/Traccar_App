@@ -16,6 +16,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 import { useCompanionStore } from '../stores/companionStore';
 import { CompanionMessageBlocks } from './companion/CompanionMessageBlocks';
+import { responsePrefersWideLayout } from './companion/presentCompanionContent';
 
 export const VehicleCompanion: React.FC = () => {
   const scrollRef = useRef<ScrollView>(null);
@@ -76,12 +77,14 @@ export const VehicleCompanion: React.FC = () => {
             contentContainerStyle={styles.messagesContent}
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
-            {messages.map(msg => (
+            {messages.map(msg => {
+              const wide = msg.role === 'assistant' && responsePrefersWideLayout(msg.blocks, msg.text);
+              return (
               <View
                 key={msg.id}
                 style={[
                   styles.bubble,
-                  msg.role === 'user' ? styles.userBubble : styles.botBubble,
+                  msg.role === 'user' ? styles.userBubble : wide ? styles.richBubble : styles.botBubble,
                   msg.error && styles.errorBubble,
                 ]}
               >
@@ -95,7 +98,8 @@ export const VehicleCompanion: React.FC = () => {
                   />
                 )}
               </View>
-            ))}
+              );
+            })}
           </ScrollView>
 
           <View style={styles.inputRow}>
@@ -202,6 +206,15 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     borderWidth: 1,
     borderColor: colors.border.default,
     width: '92%',
+  },
+  richBubble: {
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: '100%',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   errorBubble: {
     borderColor: colors.error,
