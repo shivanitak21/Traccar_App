@@ -116,13 +116,12 @@ export const getVehicleIconUrl = (model?: string, name?: string): string => {
  * Generate a data URI for a simple vehicle icon SVG
  * This is a fallback if image URLs don't work
  */
-export const getVehicleIconSVG = (color: string = '#00f3ff'): string => {
+export const getVehicleIconSVG = (color: string = '#22c55e'): string => {
   return `data:image/svg+xml;base64,${btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r="18" fill="${color}" opacity="0.9" stroke="#fff" stroke-width="2"/>
-      <path d="M12 20 L16 16 L24 16 L28 20 L28 24 L24 28 L16 28 L12 24 Z" fill="#fff"/>
-      <circle cx="16" cy="24" r="3" fill="${color}"/>
-      <circle cx="24" cy="24" r="3" fill="${color}"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="72" viewBox="0 0 36 72">
+      <rect x="4" y="2" width="28" height="68" rx="8" fill="${color}" stroke="#ffffff" stroke-width="2"/>
+      <path fill="#0f172a" opacity="0.55" d="M10 16h16l3 13H7z"/>
+      <path fill="#0f172a" opacity="0.4" d="M7 46h22l-3 13H10z"/>
     </svg>
   `)}`;
 };

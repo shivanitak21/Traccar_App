@@ -5,7 +5,7 @@ import {
   Text,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   Modal,
   TextInput,
   Platform,
@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Calendar, Clock, Navigation, MapPin, X, Filter, Eye } from 'lucide-react-native';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed, formatDistance } from '../utils/units';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 interface RouteHistoryScreenProps {
   deviceId: number;
@@ -41,12 +44,14 @@ interface RouteSegment {
   fromTime: Date;
   toTime: Date;
   distance: number; // km
-  positions: TraccarPosition[];
+  positions: ElevaticsPosition[];
 }
 
 export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId, onClose }) => {
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [route, setRoute] = useState<TraccarPosition[]>([]);
+  const { colors, isDark } = useTheme();
+  const { prefs } = usePrefsStore();
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [route, setRoute] = useState<ElevaticsPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -61,7 +66,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const [showToTimePicker, setShowToTimePicker] = useState(false);
   const [showRouteOnMap, setShowRouteOnMap] = useState(false);
 
-  const calculateStats = (positions: TraccarPosition[]): RouteStats => {
+  const calculateStats = (positions: ElevaticsPosition[]): RouteStats => {
     if (positions.length === 0) {
       return {
         totalDistance: 0,
@@ -137,7 +142,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
-      const deviceData = await traccarAPI.getDevice(deviceId);
+      const deviceData = await elevaticsAPI.getDevice(deviceId);
       setDevice(deviceData);
 
       const to = toDate || new Date();
@@ -161,7 +166,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
       const fromISO = from.toISOString();
       const toISO = to.toISOString();
 
-      const routeData = await traccarAPI.getRoute(deviceId, fromISO, toISO);
+      const routeData = await elevaticsAPI.getRoute(deviceId, fromISO, toISO);
 
       if (routeData.length === 0) {
         setRoute([]);
@@ -296,14 +301,14 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     return `${mins}m`;
   };
 
-  const getRoutePolylines = useCallback((positions: TraccarPosition[]) => {
+  const getRoutePolylines = useCallback((positions: ElevaticsPosition[]) => {
     if (positions.length < 2) return [];
 
-    const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
+    const polylines: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number; opacity?: number }[] = [];
 
     for (let i = 0; i < positions.length - 1; i++) {
       const speed = positions[i].speed * 1.852;
-      let color = colors.success;
+      let color: string = colors.success;
       if (speed > 60) color = colors.error;
       else if (speed > 20) color = colors.warning;
 
@@ -313,14 +318,15 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           { latitude: positions[i + 1].latitude, longitude: positions[i + 1].longitude },
         ],
         color,
-        width: 4,
+        width: 5,
+        opacity: 0.95,
       });
     }
 
     return polylines;
-  }, []);
+  }, [colors]);
 
-  const getMapCenter = useCallback((positions: TraccarPosition[]) => {
+  const getMapCenter = useCallback((positions: ElevaticsPosition[]) => {
     if (positions.length === 0) return { latitude: 0, longitude: 0 };
     const centerIndex = Math.floor(positions.length / 2);
     return {
@@ -333,6 +339,342 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
     setSelectedRouteSegment(segment);
     setShowRouteOnMap(true);
   };
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    loadingContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingText: {
+      ...typography.body,
+      color: colors.text.secondary,
+      marginTop: 16,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 20,
+      paddingTop: 60,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    headerText: {
+      marginLeft: 16,
+      flex: 1,
+    },
+    headerButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    title: {
+      ...typography.h2,
+      color: colors.text.primary,
+      fontWeight: '700',
+    },
+    subtitle: {
+      ...typography.small,
+      color: colors.text.secondary,
+      marginTop: 4,
+    },
+    filterButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.glass.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+    },
+    closeButtonHeader: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.glass.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+    },
+    mapContainer: {
+      height: 250,
+      margin: 20,
+      marginTop: 0,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    map: {
+      flex: 1,
+    },
+    statsContainer: {
+      paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    statsCard: {
+      padding: 16,
+    },
+    statsTitle: {
+      ...typography.h3,
+      color: colors.text.primary,
+      fontWeight: '700',
+      marginBottom: 16,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 16,
+    },
+    statItem: {
+      width: '48%',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: 'rgba(0, 243, 255, 0.05)',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+    },
+    statValue: {
+      ...typography.h3,
+      color: colors.text.primary,
+      fontWeight: '700',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    statLabel: {
+      ...typography.small,
+      color: colors.text.tertiary,
+      fontSize: 11,
+    },
+    timeRange: {
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.glass.border,
+    },
+    timeRangeText: {
+      ...typography.small,
+      color: colors.text.secondary,
+      marginBottom: 4,
+    },
+    listContainer: {
+      flex: 1,
+    },
+    listContent: {
+      padding: 20,
+      paddingTop: 0,
+    },
+    listTitle: {
+      ...typography.body,
+      color: colors.text.primary,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
+    routeItem: {
+      padding: 12,
+      marginBottom: 12,
+    },
+    routeItemHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    routeItemIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primaryGlow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    routeItemInfo: {
+      flex: 1,
+    },
+    routeItemTime: {
+      ...typography.body,
+      color: colors.text.primary,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    routeItemDistance: {
+      ...typography.body,
+      color: colors.primary,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    routeItemPoints: {
+      ...typography.small,
+      color: colors.text.tertiary,
+      marginTop: 4,
+    },
+    viewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: colors.primaryGlow,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      gap: 6,
+    },
+    viewButtonText: {
+      ...typography.small,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    closeMapButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.glass.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+      zIndex: 10,
+    },
+    datePickerScrollView: {
+      maxHeight: 400,
+    },
+    datePickerContainer: {
+      gap: 12,
+    },
+    dateLabel: {
+      ...typography.small,
+      color: colors.text.secondary,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    dateRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    dateButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.glass.background,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+    },
+    timeButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.glass.background,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+    },
+    dateButtonText: {
+      ...typography.body,
+      color: colors.text.primary,
+      fontWeight: '600',
+    },
+    applyButton: {
+      backgroundColor: colors.primary,
+      padding: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    applyButtonText: {
+      ...typography.body,
+      color: colors.text.primary,
+      fontWeight: '700',
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+    },
+    emptyText: {
+      ...typography.body,
+      color: colors.text.secondary,
+      marginTop: 16,
+      fontWeight: '600',
+    },
+    emptySubtext: {
+      ...typography.small,
+      color: colors.text.tertiary,
+      marginTop: 8,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      padding: 20,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+    },
+    mapModalContent: {
+      padding: 20,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      height: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    modalTitle: {
+      ...typography.h2,
+      color: colors.text.primary,
+      fontWeight: '700',
+    },
+    filterOptions: {
+      gap: 12,
+    },
+    filterOption: {
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: colors.glass.background,
+      borderWidth: 1,
+      borderColor: colors.glass.border,
+    },
+    filterOptionActive: {
+      backgroundColor: colors.primaryGlow,
+      borderColor: colors.primary,
+    },
+    filterOptionText: {
+      ...typography.body,
+      color: colors.text.primary,
+    },
+    filterOptionTextActive: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    modalMap: {
+      flex: 1,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+  }), [colors]);
 
   if (loading) {
     return (
@@ -355,13 +697,13 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
         </View>
 
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
+          <Pressable style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
             <Filter color={colors.text.primary} size={20} />
-          </TouchableOpacity>
+          </Pressable>
           {onClose && (
-            <TouchableOpacity style={styles.closeButtonHeader} onPress={onClose}>
+            <Pressable style={styles.closeButtonHeader} onPress={onClose}>
               <X color={colors.text.primary} size={20} />
-            </TouchableOpacity>
+            </Pressable>
           )}
         </View>
       </View>
@@ -381,14 +723,15 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 polylines={getRoutePolylines(selectedRouteSegment.positions)}
                 center={getMapCenter(selectedRouteSegment.positions)}
                 zoom={13}
+                mapLayer={getThemeBaseMapLayer(isDark)}
                 style={styles.map}
               />
-              <TouchableOpacity
+              <Pressable
                 style={styles.closeMapButton}
                 onPress={() => setShowRouteOnMap(false)}
               >
                 <X color={colors.text.primary} size={20} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.mapContainer}>
@@ -397,6 +740,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 polylines={getRoutePolylines(route)}
                 center={getMapCenter(route)}
                 zoom={13}
+                mapLayer={getThemeBaseMapLayer(isDark)}
                 style={styles.map}
               />
             </View>
@@ -409,7 +753,9 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                 <View style={styles.statsGrid}>
                   <View style={styles.statItem}>
                     <Navigation color={colors.primary} size={24} />
-                    <Text style={styles.statValue}>{stats.totalDistance} km</Text>
+                    <Text style={styles.statValue}>
+                      {formatDistance(stats.totalDistance * 1000, prefs.distanceUnit)}
+                    </Text>
                     <Text style={styles.statLabel}>Total Distance</Text>
                   </View>
                   <View style={styles.statItem}>
@@ -424,7 +770,9 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                   </View>
                   <View style={styles.statItem}>
                     <Navigation color={colors.error} size={24} />
-                    <Text style={styles.statValue}>{stats.maxSpeed} km/h</Text>
+                    <Text style={styles.statValue}>
+                      {formatSpeed(stats.maxSpeed / 1.852, prefs.speedUnit)}
+                    </Text>
                     <Text style={styles.statLabel}>Max Speed</Text>
                   </View>
                 </View>
@@ -463,13 +811,13 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                       {segment.positions.length} points
                     </Text>
                   </View>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.viewButton}
                     onPress={() => handleViewRoute(segment)}
                   >
                     <Eye color={colors.primary} size={18} />
                     <Text style={styles.viewButtonText}>View</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </GlassCard>
             ))}
@@ -487,14 +835,14 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Time Range</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+              <Pressable onPress={() => setShowFilterModal(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.filterOptions}>
               {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
-                <TouchableOpacity
+                <Pressable
                   key={filter}
                   style={[
                     styles.filterOption,
@@ -510,7 +858,7 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
                   >
                     {getFilterLabel(filter)}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           </GlassCard>
@@ -527,52 +875,52 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Custom Date Range</Text>
-              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+              <Pressable onPress={() => setShowCustomDatePicker(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <ScrollView style={styles.datePickerScrollView}>
               <View style={styles.datePickerContainer}>
                 <Text style={styles.dateLabel}>From Date & Time</Text>
                 <View style={styles.dateRow}>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.dateButton}
                     onPress={() => setShowFromDatePicker(true)}
                   >
                     <Calendar color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={styles.timeButton}
                     onPress={() => setShowFromTimePicker(true)}
                   >
                     <Clock color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
 
                 <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
                 <View style={styles.dateRow}>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.dateButton}
                     onPress={() => setShowToDatePicker(true)}
                   >
                     <Calendar color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={styles.timeButton}
                     onPress={() => setShowToTimePicker(true)}
                   >
                     <Clock color={colors.primary} size={20} />
                     <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
 
-                <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+                <Pressable style={styles.applyButton} onPress={handleCustomDateApply}>
                   <Text style={styles.applyButtonText}>Apply</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               {showFromDatePicker && (
@@ -650,338 +998,3 @@ export const RouteHistoryScreen: React.FC<RouteHistoryScreenProps> = ({ deviceId
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.text.secondary,
-    marginTop: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 60,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerText: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  subtitle: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  closeButtonHeader: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  mapContainer: {
-    height: 250,
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  map: {
-    flex: 1,
-  },
-  statsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  statsCard: {
-    padding: 16,
-  },
-  statsTitle: {
-    ...typography.h3,
-    color: colors.text.primary,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  statItem: {
-    width: '48%',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: 'rgba(0, 243, 255, 0.05)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  statValue: {
-    ...typography.h3,
-    color: colors.text.primary,
-    fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    fontSize: 11,
-  },
-  timeRange: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
-  },
-  timeRangeText: {
-    ...typography.small,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  listContainer: {
-    flex: 1,
-  },
-  listContent: {
-    padding: 20,
-    paddingTop: 0,
-  },
-  listTitle: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  routeItem: {
-    padding: 12,
-    marginBottom: 12,
-  },
-  routeItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  routeItemInfo: {
-    flex: 1,
-  },
-  routeItemTime: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  routeItemDistance: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  routeItemPoints: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    marginTop: 4,
-  },
-  viewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.primaryGlow,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    gap: 6,
-  },
-  viewButtonText: {
-    ...typography.small,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  closeMapButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.glass.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    zIndex: 10,
-  },
-  datePickerScrollView: {
-    maxHeight: 400,
-  },
-  datePickerContainer: {
-    gap: 12,
-  },
-  dateLabel: {
-    ...typography.small,
-    color: colors.text.secondary,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.glass.background,
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  timeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.glass.background,
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  dateButtonText: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  applyButton: {
-    backgroundColor: colors.primary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  applyButtonText: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.text.secondary,
-    marginTop: 16,
-    fontWeight: '600',
-  },
-  emptySubtext: {
-    ...typography.small,
-    color: colors.text.tertiary,
-    marginTop: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  mapModalContent: {
-    padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    ...typography.h2,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  filterOptions: {
-    gap: 12,
-  },
-  filterOption: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: colors.glass.background,
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-  },
-  filterOptionActive: {
-    backgroundColor: colors.primaryGlow,
-    borderColor: colors.primary,
-  },
-  filterOptionText: {
-    ...typography.body,
-    color: colors.text.primary,
-  },
-  filterOptionTextActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  modalMap: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-});

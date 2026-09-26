@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   Text,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Alert,
   TextInput,
   Modal,
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarGeofence } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsGeofence } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { MapPinned, Plus, Trash2, Edit3, X, Save, Square, RectangleHorizontal } from 'lucide-react-native';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 interface GeofenceScreenProps {
   deviceId: number;
@@ -26,13 +27,15 @@ interface GeofenceScreenProps {
 type DrawingMode = 'none' | 'polygon' | 'rectangle';
 
 export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClose }) => {
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [geofences, setGeofences] = useState<TraccarGeofence[]>([]);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [geofences, setGeofences] = useState<ElevaticsGeofence[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>('none');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingGeofence, setEditingGeofence] = useState<TraccarGeofence | null>(null);
+  const [editingGeofence, setEditingGeofence] = useState<ElevaticsGeofence | null>(null);
   const [geofenceName, setGeofenceName] = useState('');
   const [geofenceDescription, setGeofenceDescription] = useState('');
   const [drawnArea, setDrawnArea] = useState<string | null>(null);
@@ -41,9 +44,9 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
   const loadData = async () => {
     try {
       const [deviceData, geofencesData, positionsData] = await Promise.all([
-        traccarAPI.getDevice(deviceId),
-        traccarAPI.getGeofences(),
-        traccarAPI.getPositions(deviceId),
+        elevaticsAPI.getDevice(deviceId),
+        elevaticsAPI.getGeofences(),
+        elevaticsAPI.getPositions(deviceId),
       ]);
 
       setDevice(deviceData);
@@ -84,7 +87,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     setShowEditModal(false);
   };
 
-  const zoomToGeofence = (geofence: TraccarGeofence) => {
+  const zoomToGeofence = (geofence: ElevaticsGeofence) => {
     try {
       console.log('Zooming to geofence:', geofence.name, geofence.area);
       
@@ -125,7 +128,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     }
   };
 
-  const handleEditGeofence = (geofence: TraccarGeofence) => {
+  const handleEditGeofence = (geofence: ElevaticsGeofence) => {
     setEditingGeofence(geofence);
     setGeofenceName(geofence.name);
     setGeofenceDescription(geofence.description || '');
@@ -138,7 +141,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
     zoomToGeofence(geofence);
   };
 
-  const handleDeleteGeofence = async (geofence: TraccarGeofence) => {
+  const handleDeleteGeofence = async (geofence: ElevaticsGeofence) => {
     Alert.alert(
       'Delete Geofence',
       `Are you sure you want to delete "${geofence.name}"?`,
@@ -149,7 +152,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
           style: 'destructive',
           onPress: async () => {
             try {
-              await traccarAPI.deleteGeofence(geofence.id);
+              await elevaticsAPI.deleteGeofence(geofence.id);
               await loadData();
               Alert.alert('Success', 'Geofence deleted successfully');
             } catch (error) {
@@ -177,14 +180,14 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
       const area = drawnArea || editingGeofence?.area || '';
       
       if (editingGeofence) {
-        await traccarAPI.updateGeofence(editingGeofence.id, {
+        await elevaticsAPI.updateGeofence(editingGeofence.id, {
           name: geofenceName,
           description: geofenceDescription,
           area: area,
         });
         Alert.alert('Success', 'Geofence updated successfully');
       } else {
-        await traccarAPI.createGeofence({
+        await elevaticsAPI.createGeofence({
           name: geofenceName,
           description: geofenceDescription,
           area: area,
@@ -232,9 +235,9 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
   return (
     <LinearGradient colors={colors.gradient.dark} style={styles.container}>
       {onClose && (
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Pressable style={styles.closeButton} onPress={onClose}>
           <X color={colors.text.primary} size={24} />
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       <View style={styles.header}>
@@ -249,11 +252,11 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
 
       <View style={styles.actionBar}>
         {drawingMode === 'none' ? (
-          <TouchableOpacity style={styles.addButton} onPress={handleCreateGeofence}>
+          <Pressable style={styles.addButton} onPress={handleCreateGeofence}>
             <Plus color={colors.text.primary} size={24} />
-          </TouchableOpacity>
+          </Pressable>
         ) : (
-          <TouchableOpacity 
+          <Pressable 
             style={[styles.addButton, styles.cancelButton]} 
             onPress={() => {
               setDrawingMode('none');
@@ -261,7 +264,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
             }}
           >
             <X color={colors.text.primary} size={24} />
-          </TouchableOpacity>
+          </Pressable>
         )}
       </View>
 
@@ -275,9 +278,9 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Shape Type</Text>
-              <TouchableOpacity onPress={() => setShowShapeSelector(false)}>
+              <Pressable onPress={() => setShowShapeSelector(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.shapeSelectorContainer}>
@@ -285,7 +288,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                 Choose the shape type for your geofence
               </Text>
               
-              <TouchableOpacity
+              <Pressable
                 style={styles.shapeOption}
                 onPress={() => handleShapeSelect('polygon')}
               >
@@ -296,9 +299,9 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                     Draw a custom polygon shape by tapping points on the map
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 style={styles.shapeOption}
                 onPress={() => handleShapeSelect('rectangle')}
               >
@@ -309,7 +312,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                     Draw a rectangle by clicking and dragging on the map
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </GlassCard>
         </View>
@@ -326,6 +329,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
           onGeofencePress={handleGeofencePress}
           drawingMode={drawingMode}
           onGeofenceDrawn={handleMapDrawing}
+          mapLayer={getThemeBaseMapLayer(isDark)}
           style={styles.map}
         />
         {drawingMode !== 'none' && (
@@ -337,7 +341,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                   ? '📍 Tap on map to add points\nDouble-tap to finish' 
                   : '▭ Click and drag to draw rectangle'}
               </Text>
-              <TouchableOpacity 
+              <Pressable 
                 style={styles.cancelDrawingButton}
                 onPress={() => {
                   setDrawingMode('none');
@@ -345,7 +349,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                 }}
               >
                 <Text style={styles.cancelDrawingText}>Cancel Drawing</Text>
-              </TouchableOpacity>
+              </Pressable>
             </GlassCard>
           </View>
         )}
@@ -363,7 +367,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
         ) : (
           geofences.map((geofence) => (
             <GlassCard key={geofence.id} style={styles.geofenceCard}>
-              <TouchableOpacity
+              <Pressable
                 style={styles.geofenceContent}
                 onPress={() => {
                   setSelectedGeofenceId(geofence.id);
@@ -381,24 +385,24 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                     )}
                   </View>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
 
               <View style={styles.geofenceActions}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.actionButton}
                   onPress={() => handleEditGeofence(geofence)}
                 >
                   <Edit3 color={colors.primary} size={18} />
                   <Text style={styles.actionText}>Edit</Text>
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                   style={[styles.actionButton, styles.deleteButton]}
                   onPress={() => handleDeleteGeofence(geofence)}
                 >
                   <Trash2 color={colors.error} size={18} />
                   <Text style={[styles.actionText, { color: colors.error }]}>Delete</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </GlassCard>
           ))
@@ -421,7 +425,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
               <Text style={styles.modalTitle}>
                 {editingGeofence ? 'Edit Geofence' : 'Create Geofence'}
               </Text>
-              <TouchableOpacity
+              <Pressable
                 onPress={() => {
                   setShowEditModal(false);
                   setDrawingMode('none');
@@ -429,7 +433,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                 }}
               >
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.form}>
@@ -455,7 +459,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
               {drawnArea ? (
                 <View style={styles.drawnAreaSuccess}>
                   <Text style={styles.drawnAreaSuccessText}>✓ Geofence drawn successfully!</Text>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.redrawButton}
                     onPress={() => {
                       setDrawnArea(null);
@@ -464,13 +468,13 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                     }}
                   >
                     <Text style={styles.redrawButtonText}>Draw Again</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               ) : (
                 <>
                   <Text style={styles.label}>Drawing Mode</Text>
                   <View style={styles.drawingModeButtons}>
-                    <TouchableOpacity
+                    <Pressable
                       style={[
                         styles.drawingModeButton,
                         drawingMode === 'polygon' && styles.drawingModeButtonActive,
@@ -489,8 +493,8 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                       >
                         Polygon
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                    </Pressable>
+                    <Pressable
                       style={[
                         styles.drawingModeButton,
                         drawingMode === 'rectangle' && styles.drawingModeButtonActive,
@@ -509,7 +513,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                       >
                         Rectangle
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
 
                   <Text style={styles.helpText}>
@@ -518,12 +522,12 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
                 </>
               )}
 
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveGeofence}>
+              <Pressable style={styles.saveButton} onPress={handleSaveGeofence}>
                 <Save color={colors.text.primary} size={20} />
                 <Text style={styles.saveButtonText}>
                   {editingGeofence ? 'Update' : 'Create'} Geofence
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </GlassCard>
         </View>
@@ -532,7 +536,7 @@ export const GeofenceScreen: React.FC<GeofenceScreenProps> = ({ deviceId, onClos
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
   },

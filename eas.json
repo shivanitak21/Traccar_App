@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ELEVATICS_IOT_BASE_URL": "https://elevaticsiot.com",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw",
+        "EXPO_PUBLIC_AI_COMPANION_URL": "https://traccar-agent-v2.elevatics.site"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ELEVATICS_IOT_BASE_URL": "https://elevaticsiot.com",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw",
+        "EXPO_PUBLIC_AI_COMPANION_URL": "https://traccar-agent-v2.elevatics.site"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_ELEVATICS_IOT_BASE_URL": "https://elevaticsiot.com",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoidmluZWV0MDE5IiwiYSI6ImNtYzIyNG9rOTAzbnYyanE1a2dweGZ3azQifQ.NQ6QssrC2iQzgb-tLdMLDw",
+        "EXPO_PUBLIC_AI_COMPANION_URL": "https://traccar-agent-v2.elevatics.site"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

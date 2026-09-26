@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Text,
   ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   Dimensions,
   Alert,
   Modal,
@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { traccarAPI, TraccarDevice, TraccarPosition } from '../api/traccar';
+import { elevaticsAPI, ElevaticsDevice, ElevaticsPosition } from '../api/elevatics';
 import { GlassCard } from '../components/GlassCard';
 import { WebMapView } from '../components/WebMapView';
 import { Play, Pause, SkipBack, SkipForward, X, Calendar, Filter, Clock } from 'lucide-react-native';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed } from '../utils/units';
+import { getThemeBaseMapLayer } from '../utils/mapTheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,12 +33,15 @@ interface PlaybackScreenProps {
 type TimeFilter = '24h' | '7d' | '30d' | 'custom';
 
 export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClose }) => {
-  const [device, setDevice] = useState<TraccarDevice | null>(null);
-  const [route, setRoute] = useState<TraccarPosition[]>([]);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [device, setDevice] = useState<ElevaticsDevice | null>(null);
+  const [route, setRoute] = useState<ElevaticsPosition[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [initialCenter, setInitialCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const { prefs } = usePrefsStore();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [customFromDate, setCustomFromDate] = useState<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
@@ -45,47 +51,22 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   const [showToDatePicker, setShowToDatePicker] = useState(false);
   const [showFromTimePicker, setShowFromTimePicker] = useState(false);
   const [showToTimePicker, setShowToTimePicker] = useState(false);
-  const playbackInterval = useRef<NodeJS.Timeout | null>(null);
-  const lastUpdateTime = useRef<number>(0);
-  const mapCenterUpdateThrottle = useRef<number>(0);
+  const playbackInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Memoize polylines to prevent unnecessary recalculations - MUST be before early returns
+  // Only the moving trail — no full-route or future segments (prevents flash)
   const polylines = useMemo(() => {
-    if (route.length === 0 || currentIndex < 0) return [];
-    const result: { coordinates: { latitude: number; longitude: number }[]; color: string; width: number }[] = [];
-    
-    if (currentIndex > 0) {
-      const pastCoordinates = route.slice(0, currentIndex + 1).map(p => ({
+    if (route.length < 2 || currentIndex < 1) return [];
+    return [{
+      id: 'trail',
+      coordinates: route.slice(0, currentIndex + 1).map(p => ({
         latitude: p.latitude,
         longitude: p.longitude,
-      }));
-      
-      if (pastCoordinates.length > 1) {
-        result.push({
-          coordinates: pastCoordinates,
-          color: '#1a1a2e',
-          width: 5,
-        });
-      }
-    }
-    
-    if (currentIndex < route.length - 1) {
-      const futureCoordinates = route.slice(currentIndex).map(p => ({
-        latitude: p.latitude,
-        longitude: p.longitude,
-      }));
-      
-      if (futureCoordinates.length > 1) {
-        result.push({
-          coordinates: futureCoordinates,
-          color: '#0d0d1a',
-          width: 3,
-        });
-      }
-    }
-    
-    return result;
-  }, [route, currentIndex]);
+      })),
+      color: colors.blue,
+      width: 6,
+      opacity: 1,
+    }];
+  }, [route, currentIndex, colors.blue]);
 
   // Calculate current position and markers - MUST be before early returns
   const currentPosition = useMemo(() => {
@@ -93,8 +74,8 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   }, [route, currentIndex]);
 
   const speed = useMemo(() => {
-    return currentPosition ? Math.round(currentPosition.speed * 1.852) : 0;
-  }, [currentPosition]);
+    return currentPosition ? formatSpeed(currentPosition.speed, prefs.speedUnit) : formatSpeed(0, prefs.speedUnit);
+  }, [currentPosition, prefs.speedUnit]);
 
   // Single vehicle marker at current position
   const markers = useMemo(() => {
@@ -104,17 +85,18 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
         latitude: currentPosition.latitude,
         longitude: currentPosition.longitude,
         title: device?.name || 'Device',
-        description: `${speed} km/h • ${new Date(currentPosition.fixTime).toLocaleTimeString()}`,
+        description: speed,
         color: colors.primary,
-        status: 'online',
+        status: currentPosition.speed > 0 ? 'moving' : 'online',
+        course: currentPosition.course || 0,
       },
     ] : [];
-  }, [currentPosition, device, speed]);
+  }, [currentPosition, device, speed, colors]);
 
   const loadRoute = useCallback(async (filter: TimeFilter = timeFilter, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true);
-      const deviceData = await traccarAPI.getDevice(deviceId);
+      const deviceData = await elevaticsAPI.getDevice(deviceId);
       setDevice(deviceData);
 
       const to = toDate || new Date();
@@ -139,7 +121,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
       const fromISO = from.toISOString();
       const toISO = to.toISOString();
 
-      const routeData = await traccarAPI.getRoute(deviceId, fromISO, toISO);
+      const routeData = await elevaticsAPI.getReportRoute(deviceId, fromISO, toISO);
 
       if (routeData.length === 0) {
         Alert.alert('No Data', `No route data found for the selected time period`);
@@ -152,7 +134,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
 
         if (routeData.length > 0) {
           const firstPoint = routeData[0];
-          setMapCenter({ latitude: firstPoint.latitude, longitude: firstPoint.longitude });
+          setInitialCenter({ latitude: firstPoint.latitude, longitude: firstPoint.longitude });
         }
       }
     } catch (error) {
@@ -177,7 +159,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     if (isPlaying && route.length > 0) {
       // Calculate playback speed to complete in 15 seconds
       const totalDuration = 15000;
-      const intervalTime = Math.max(100, Math.floor(totalDuration / route.length));
+      const intervalTime = Math.max(250, Math.floor(totalDuration / route.length));
       
       playbackInterval.current = setInterval(() => {
         setCurrentIndex(prev => {
@@ -200,24 +182,6 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
       }
     };
   }, [isPlaying, route.length]);
-  
-  // Optimized map center updates - only update every 10 points or when paused to prevent blinking
-  useEffect(() => {
-    if (route.length > 0) {
-      const currentPosition = route[currentIndex];
-      if (currentPosition) {
-        const now = Date.now();
-        // Throttle updates: only update every 500ms when playing, or immediately when paused
-        if (!isPlaying || (now - mapCenterUpdateThrottle.current > 500)) {
-          mapCenterUpdateThrottle.current = now;
-          setMapCenter({
-            latitude: currentPosition.latitude,
-            longitude: currentPosition.longitude,
-          });
-        }
-      }
-    }
-  }, [currentIndex, route.length, isPlaying]);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -278,8 +242,8 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     const kmh = speed * 1.852;
     // Using darker, muted colors for better visibility on map
     if (kmh < 20) return '#1a4d2e'; // Dark green
-    if (kmh < 60) return '#8b5a00'; // Dark orange
-    return '#6b0000'; // Dark red
+    if (kmh < 60) return '#2563A8'; // Medium blue
+    return '#1A4A7A'; // Deep blue (high speed)
   };
 
   const getFilterLabel = (filter: TimeFilter) => {
@@ -297,7 +261,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     }
   };
 
-  if (loading) {
+  if (loading && route.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -306,20 +270,20 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
     );
   }
 
-  if (route.length === 0) {
+  if (route.length === 0 && !loading) {
     return (
       <View style={styles.container}>
         {onClose && (
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Pressable style={styles.closeButton} onPress={onClose}>
             <X color={colors.text.primary} size={24} />
-          </TouchableOpacity>
+          </Pressable>
         )}
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>No route data available</Text>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
+          <Pressable style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
             <Filter color={colors.primary} size={20} />
             <Text style={styles.filterButtonText}>Change Time Range</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     );
@@ -328,27 +292,37 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   return (
     <View style={styles.container}>
       {onClose && (
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Pressable style={styles.closeButton} onPress={onClose}>
           <X color={colors.text.primary} size={24} />
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       <WebMapView
         markers={markers}
         polylines={polylines}
-        center={mapCenter || { latitude: route[0].latitude, longitude: route[0].longitude }}
-        zoom={13}
+        center={initialCenter || (route[0] ? { latitude: route[0].latitude, longitude: route[0].longitude } : { latitude: 0, longitude: 0 })}
+        zoom={14}
+        mapLayer={getThemeBaseMapLayer(isDark)}
+        smoothPlayback
+        followMarker={isPlaying}
         style={styles.map}
       />
 
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading route...</Text>
+        </View>
+      )}
+
       {/* Filter button - positioned to not overlap close button */}
-      <TouchableOpacity
+      <Pressable
         style={styles.filterButtonTop}
         onPress={() => setShowFilterModal(true)}
       >
         <Calendar color={colors.text.primary} size={18} />
         <Text style={styles.filterButtonText}>{getFilterLabel(timeFilter)}</Text>
-      </TouchableOpacity>
+      </Pressable>
 
       <View style={styles.controlsContainer}>
         <GlassCard style={styles.controlsCard}>
@@ -360,7 +334,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Speed:</Text>
               <Text style={[styles.infoValue, { color: getSpeedColor(currentPosition?.speed || 0) }]}>
-                {speed} km/h
+                {speed}
               </Text>
             </View>
           </View>
@@ -392,21 +366,21 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           </View>
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.controlButton} onPress={handleSkipBackward}>
+            <Pressable style={styles.controlButton} onPress={handleSkipBackward}>
               <SkipBack color={colors.text.primary} size={24} />
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
+            <Pressable style={styles.playButton} onPress={handlePlayPause}>
               {isPlaying ? (
                 <Pause color={colors.text.primary} size={32} />
               ) : (
                 <Play color={colors.text.primary} size={32} />
               )}
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.controlButton} onPress={handleSkipForward}>
+            <Pressable style={styles.controlButton} onPress={handleSkipForward}>
               <SkipForward color={colors.text.primary} size={24} />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </GlassCard>
       </View>
@@ -421,14 +395,14 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Time Range</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+              <Pressable onPress={() => setShowFilterModal(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.filterOptions}>
               {(['24h', '7d', '30d', 'custom'] as TimeFilter[]).map((filter) => (
-                <TouchableOpacity
+                <Pressable
                   key={filter}
                   style={[
                     styles.filterOption,
@@ -444,7 +418,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
                   >
                     {getFilterLabel(filter)}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           </GlassCard>
@@ -461,51 +435,51 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
           <GlassCard style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Custom Date Range</Text>
-              <TouchableOpacity onPress={() => setShowCustomDatePicker(false)}>
+              <Pressable onPress={() => setShowCustomDatePicker(false)}>
                 <X color={colors.text.primary} size={24} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.datePickerContainer}>
               <Text style={styles.dateLabel}>From Date & Time</Text>
               <View style={styles.dateRow}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.dateButton}
                   onPress={() => setShowFromDatePicker(true)}
                 >
                   <Calendar color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[0]}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </Pressable>
+                <Pressable
                   style={styles.timeButton}
                   onPress={() => setShowFromTimePicker(true)}
                 >
                   <Clock color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customFromDate).split(' ')[1]}</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <Text style={[styles.dateLabel, { marginTop: 16 }]}>To Date & Time</Text>
               <View style={styles.dateRow}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.dateButton}
                   onPress={() => setShowToDatePicker(true)}
                 >
                   <Calendar color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[0]}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </Pressable>
+                <Pressable
                   style={styles.timeButton}
                   onPress={() => setShowToTimePicker(true)}
                 >
                   <Clock color={colors.primary} size={20} />
                   <Text style={styles.dateButtonText}>{formatDateTime(customToDate).split(' ')[1]}</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
-              <TouchableOpacity style={styles.applyButton} onPress={handleCustomDateApply}>
+              <Pressable style={styles.applyButton} onPress={handleCustomDateApply}>
                 <Text style={styles.applyButtonText}>Apply</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             {showFromDatePicker && (
@@ -582,7 +556,7 @@ export const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ deviceId, onClos
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -597,6 +571,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.secondary,
     marginTop: 16,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13,15,20,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
   },
   closeButton: {
     position: 'absolute',

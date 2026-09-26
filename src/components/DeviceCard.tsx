@@ -1,228 +1,308 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { GlassCard } from './GlassCard';
-import { colors } from '../theme/colors';
+import React, { useMemo, useState, memo } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import {
+  Navigation,
+  MapPin,
+  Power,
+  ChevronRight,
+  Map,
+  History,
+  Terminal,
+  Info,
+  Clock,
+} from 'lucide-react-native';
+import { ControlButton, ControlButtonRow } from './ui/ControlButton';
+import { StatusChip } from './ui/StatusChip';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
-import { TraccarDevice } from '../api/traccar';
-import { Car, Circle, Navigation, Play, MapPinned, Info, Radio } from 'lucide-react-native';
-import { getVehicleImageUrl } from '../utils/vehicleImages';
+import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
+import { createShadows } from '../theme/shadows';
+import { DeviceWithPosition } from '../stores/fleetStore';
+import { usePrefsStore } from '../stores/prefsStore';
+import { formatSpeed } from '../utils/units';
+import { getLocationLabel } from '../utils/address';
 
 interface DeviceCardProps {
-  device: TraccarDevice;
-  index: number;
+  device: DeviceWithPosition;
+  onOpenCompanion: () => void;
   onLiveTrack: () => void;
   onPlayback: () => void;
   onGeofence: () => void;
-  onDeviceInfo: () => void;
+  onInfo: () => void;
   onCommands: () => void;
+  defaultExpanded?: boolean;
 }
 
-export const DeviceCard: React.FC<DeviceCardProps> = ({
+export const DeviceCard: React.FC<DeviceCardProps> = memo(({
   device,
-  index,
+  onOpenCompanion,
   onLiveTrack,
   onPlayback,
   onGeofence,
-  onDeviceInfo,
+  onInfo,
   onCommands,
+  defaultExpanded = false,
 }) => {
-  const isOnline = device.status === 'online';
-  const statusColor = isOnline ? colors.success : colors.text.tertiary;
-  const vehicleImageUrl = getVehicleImageUrl(device.model, device.name);
-  const [imageError, setImageError] = React.useState(false);
-  const [imageLoading, setImageLoading] = React.useState(true);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const { prefs } = usePrefsStore();
+
+  const statusVariant = device.isMoving
+    ? 'moving'
+    : device.computedStatus === 'online'
+      ? 'idle'
+      : 'offline';
+
+  const statusLabel =
+    device.isMoving && device.position
+      ? formatSpeed(device.position.speed, prefs.speedUnit)
+      : device.computedStatus === 'online'
+        ? 'Idle'
+        : 'Offline';
+
+  const accentColor = device.isMoving
+    ? colors.blue
+    : device.computedStatus === 'online'
+      ? colors.success
+      : colors.text.tertiary;
+
+  const location = getLocationLabel({
+    address: device.address,
+    positionAddress: device.position?.address,
+    latitude: device.position?.latitude,
+    longitude: device.position?.longitude,
+  });
+
+  const lastUpdate = device.lastUpdate
+    ? new Date(device.lastUpdate).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : device.position?.fixTime
+      ? new Date(device.position.fixTime).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
 
   return (
-    <GlassCard style={styles.card}>
-      <View style={styles.imageContainer}>
-        {imageError ? (
-          <View style={[styles.vehicleImage, styles.placeholderContainer]}>
-            <Car color={colors.primary} size={64} />
-            <Text style={styles.placeholderText}>{device.name}</Text>
+    <View
+      style={styles.card}
+      accessibilityRole="summary"
+      accessibilityLabel={`${device.name}, ${statusLabel}`}
+    >
+      <View style={[styles.statusBar, { backgroundColor: accentColor }]} />
+
+      <View style={styles.mainRow}>
+        <Pressable
+          onPress={onOpenCompanion}
+          style={({ pressed }) => [styles.mainPressable, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open companion for ${device.name}`}
+        >
+          <View style={[styles.iconWrap, { borderColor: `${accentColor}30` }]}>
+            <Navigation size={20} color={accentColor} strokeWidth={1.6} />
           </View>
-        ) : (
-          <>
-            {imageLoading && (
-              <View style={[styles.vehicleImage, styles.loadingContainer]}>
-                <Car color={colors.primary} size={48} />
+
+          <View style={styles.info}>
+            <Text style={styles.name} numberOfLines={1}>
+              {device.name}
+            </Text>
+            <Text style={styles.id}>{device.uniqueId}</Text>
+            {!!location && (
+              <View style={styles.metaRow}>
+                <MapPin size={10} color={colors.text.tertiary} strokeWidth={2} />
+                <Text style={styles.metaText} numberOfLines={2}>
+                  {location}
+                </Text>
               </View>
             )}
-            <Image
-              source={{ uri: vehicleImageUrl }}
-              style={[styles.vehicleImage, imageLoading && styles.hidden]}
-              resizeMode="cover"
-              onError={() => {
-                setImageError(true);
-                setImageLoading(false);
-              }}
-              onLoad={() => setImageLoading(false)}
-            />
-          </>
-        )}
-        <View style={styles.imageOverlay}>
-          <View style={styles.header}>
-            <View style={styles.info}>
-              <Text style={styles.name}>{device.name}</Text>
-              <Text style={styles.uniqueId}>{device.uniqueId}</Text>
-            </View>
-            <View style={styles.status}>
-              <Circle color={statusColor} size={12} fill={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {isOnline ? 'Online' : 'Offline'}
-              </Text>
-            </View>
+            {lastUpdate ? (
+              <View style={styles.metaRow}>
+                <Clock size={10} color={colors.text.tertiary} strokeWidth={2} />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {lastUpdate}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        </View>
+
+          <View style={styles.rightSection}>
+            <StatusChip label={statusLabel} variant={statusVariant} size="sm" />
+            {device.ignitionOn !== undefined && (
+              <View style={styles.ignitionRow}>
+                <Power
+                  size={11}
+                  color={device.ignitionOn ? colors.success : colors.text.tertiary}
+                  strokeWidth={2}
+                />
+                <Text
+                  style={[
+                    styles.ignitionText,
+                    { color: device.ignitionOn ? colors.success : colors.text.tertiary },
+                  ]}
+                >
+                  {device.ignitionOn ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          hitSlop={8}
+          style={styles.expandBtn}
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Collapse actions' : 'Expand actions'}
+          accessibilityState={{ expanded }}
+        >
+          <ChevronRight
+            size={16}
+            color={colors.text.tertiary}
+            strokeWidth={1.8}
+            style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
+          />
+        </Pressable>
       </View>
 
-      {device.lastUpdate && (
-        <View style={styles.footer}>
-          <Text style={styles.lastUpdate}>
-            Last update: {new Date(device.lastUpdate).toLocaleString()}
-          </Text>
+      {expanded && (
+        <View style={styles.actions}>
+          <ControlButtonRow>
+            <ControlButton
+              size="sm"
+              icon={<Navigation size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Live"
+              onPress={onLiveTrack}
+            />
+            <ControlButton
+              size="sm"
+              icon={<History size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Playback"
+              onPress={onPlayback}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Map size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Geofence"
+              onPress={onGeofence}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Terminal size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Commands"
+              onPress={onCommands}
+            />
+            <ControlButton
+              size="sm"
+              icon={<Info size={16} color={colors.text.primary} strokeWidth={1.8} />}
+              label="Details"
+              onPress={onInfo}
+            />
+          </ControlButtonRow>
         </View>
       )}
-
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={onLiveTrack}>
-          <Navigation color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Live</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onPlayback}>
-          <Play color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Playback</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onGeofence}>
-          <MapPinned color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Geofence</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onDeviceInfo}>
-          <Info color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Info</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onCommands}>
-          <Radio color={colors.secondary} size={18} />
-          <Text style={styles.actionText}>Commands</Text>
-        </TouchableOpacity>
-      </View>
-    </GlassCard>
+    </View>
   );
-};
-
-const styles = StyleSheet.create({
-  card: {
-    marginBottom: 16,
-    padding: 0,
-    overflow: 'hidden',
-  },
-  imageContainer: {
-    width: '100%',
-    height: 280,
-    position: 'relative',
-  },
-  vehicleImage: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholderContainer: {
-    backgroundColor: colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    ...typography.body,
-    color: colors.text.primary,
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    backgroundColor: colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  hidden: {
-    opacity: 0,
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 16,
-    paddingTop: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    ...typography.body,
-    color: colors.text.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  uniqueId: {
-    ...typography.small,
-    color: colors.text.tertiary,
-  },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusText: {
-    ...typography.small,
-    fontWeight: '500',
-  },
-  footer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: 'rgba(26, 26, 46, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: colors.glass.border,
-  },
-  lastUpdate: {
-    ...typography.small,
-    color: colors.text.secondary,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: 'rgba(26, 26, 46, 0.95)',
-  },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 243, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: colors.glass.border,
-    gap: 4,
-  },
-  actionText: {
-    ...typography.small,
-    color: colors.text.primary,
-    fontSize: 10,
-    fontWeight: '600',
-  },
 });
+
+DeviceCard.displayName = 'DeviceCard';
+
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors'], isDark: boolean) => {
+  const elevation = createShadows(isDark, colors);
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.card,
+      marginHorizontal: spacing.screenPadding,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+      overflow: 'hidden',
+      ...elevation.card,
+    },
+    statusBar: {
+      height: 2,
+    },
+    mainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingRight: 8,
+      gap: 4,
+    },
+    mainPressable: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      gap: 12,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    expandBtn: {
+      padding: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 44,
+      minHeight: 44,
+    },
+    iconWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    info: {
+      flex: 1,
+      gap: 4,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 4,
+      marginTop: 2,
+    },
+    name: {
+      ...typography.bodyMd,
+      color: colors.text.primary,
+    },
+    id: {
+      ...typography.small,
+      color: colors.text.tertiary,
+      fontVariant: ['tabular-nums'],
+    },
+    metaText: {
+      ...typography.small,
+      color: colors.text.tertiary,
+      flex: 1,
+    },
+    rightSection: {
+      alignItems: 'flex-end',
+      gap: 4,
+    },
+    ignitionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    ignitionText: {
+      ...typography.tiny,
+      fontWeight: '600',
+    },
+    actions: {
+      paddingHorizontal: 14,
+      paddingBottom: 16,
+      paddingTop: 4,
+    },
+  });
+};

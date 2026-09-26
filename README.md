@@ -1,10 +1,10 @@
 # Fleet Tracker
 
-A professional fleet management mobile application built with React Native and Expo that integrates with Traccar GPS tracking platform.
+A professional fleet management mobile application built with React Native and Expo that integrates with the Elevatics IoT GPS tracking platform.
 
 ## Features
 
-- **Secure Authentication** - Basic authentication with Traccar server
+- **Secure Authentication** - Basic authentication with Elevatics IoT server
 - **Real-time Dashboard** - Fleet statistics with animated charts and metrics
 - **Live GPS Tracking** - Real-time device location tracking with WebSocket updates
 - **Device Management** - Comprehensive device list with search and filtering
@@ -21,7 +21,7 @@ A professional fleet management mobile application built with React Native and E
 - Node.js (v18 or higher)
 - npm or yarn
 - Expo CLI (optional, for local development)
-- Traccar server access
+- Elevatics IoT server access
 
 ### Installation
 
@@ -41,8 +41,8 @@ npm run dev
 ### Configuration
 
 1. Launch the app
-2. Enter your Traccar server URL
-3. Log in with your Traccar credentials (email and password)
+2. Enter your Elevatics IoT server URL
+3. Log in with your Elevatics IoT credentials (email and password)
 
 ## Tech Stack
 
@@ -58,7 +58,7 @@ npm run dev
 
 ```
 /src
-  /api          - Traccar API client and WebSocket integration
+  /api          - Elevatics IoT API client and WebSocket integration
   /screens      - Application screens
   /components   - Reusable UI components
   /theme        - Design system (colors, typography)
@@ -71,7 +71,7 @@ npm run dev
 
 ## API Integration
 
-The application integrates with the Traccar REST API:
+The application integrates with the Elevatics IoT REST API:
 
 - **Authentication**: Basic Auth with base64-encoded credentials
 - **REST Endpoints**: Devices, positions, geofences, events, commands

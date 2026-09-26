@@ -1,10 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeServerUrl } from './serverUrl';
 
 const KEYS = {
-  SESSION: '@traccar_session',
-  USER: '@traccar_user',
-  SERVER_URL: '@traccar_server',
-};
+  SESSION: '@elevatics_session',
+  SESSION_COOKIE: '@elevatics_cookie',
+  USER: '@elevatics_user',
+  SERVER_URL: '@elevatics_server',
+  MAP_STYLE: '@elevatics_map_style',
+  PREFERENCES: '@elevatics_prefs',
+} as const;
 
 export const storage = {
   async saveSession(session: string) {
@@ -12,7 +16,15 @@ export const storage = {
   },
 
   async getSession(): Promise<string | null> {
-    return await AsyncStorage.getItem(KEYS.SESSION);
+    return AsyncStorage.getItem(KEYS.SESSION);
+  },
+
+  async saveSessionCookie(cookie: string) {
+    await AsyncStorage.setItem(KEYS.SESSION_COOKIE, cookie);
+  },
+
+  async getSessionCookie(): Promise<string | null> {
+    return AsyncStorage.getItem(KEYS.SESSION_COOKIE);
   },
 
   async saveUser(user: any) {
@@ -25,14 +37,51 @@ export const storage = {
   },
 
   async saveServerUrl(url: string) {
-    await AsyncStorage.setItem(KEYS.SERVER_URL, url);
+    const normalized = normalizeServerUrl(url);
+    await AsyncStorage.setItem(KEYS.SERVER_URL, normalized);
   },
 
   async getServerUrl(): Promise<string | null> {
-    return await AsyncStorage.getItem(KEYS.SERVER_URL);
+    const url = await AsyncStorage.getItem(KEYS.SERVER_URL);
+    if (!url) return null;
+
+    const normalized = normalizeServerUrl(url);
+    if (normalized !== url) {
+      await AsyncStorage.setItem(KEYS.SERVER_URL, normalized);
+    }
+    return normalized;
+  },
+
+  async saveMapStyle(style: string) {
+    await AsyncStorage.setItem(KEYS.MAP_STYLE, style);
+  },
+
+  async getMapStyle(): Promise<string | null> {
+    return AsyncStorage.getItem(KEYS.MAP_STYLE);
+  },
+
+  async savePreferences(prefs: Record<string, any>) {
+    await AsyncStorage.setItem(KEYS.PREFERENCES, JSON.stringify(prefs));
+  },
+
+  async getPreferences(): Promise<Record<string, any>> {
+    const data = await AsyncStorage.getItem(KEYS.PREFERENCES);
+    return data ? JSON.parse(data) : {};
+  },
+
+  async clearSession() {
+    await AsyncStorage.multiRemove([KEYS.SESSION, KEYS.SESSION_COOKIE, KEYS.USER]);
   },
 
   async clearAll() {
-    await AsyncStorage.multiRemove([KEYS.SESSION, KEYS.USER, KEYS.SERVER_URL]);
+    await AsyncStorage.multiRemove(Object.values(KEYS));
+  },
+
+  async getItem(key: string): Promise<string | null> {
+    return AsyncStorage.getItem(key);
+  },
+
+  async setItem(key: string, value: string): Promise<void> {
+    await AsyncStorage.setItem(key, value);
   },
 };

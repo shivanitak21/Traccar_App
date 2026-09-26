@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GlassCard } from './GlassCard';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { typography } from '../theme/typography';
 
 interface StatCardProps {
@@ -12,6 +12,9 @@ interface StatCardProps {
 }
 
 export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, index }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <GlassCard gradient style={styles.card}>
@@ -23,7 +26,7 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, index })
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     minWidth: '45%',

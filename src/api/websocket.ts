@@ -1,69 +1,76 @@
-import { traccarAPI, TraccarPosition, TraccarDevice, TraccarEvent } from './traccar';
+import { elevaticsAPI } from './elevatics';
+import { storage } from '../utils/storage';
+import { WS_RECONNECT_DELAY, WS_MAX_RECONNECT_DELAY } from './config';
 
+type WebSocketEvent = 'connected' | 'positions' | 'devices' | 'events';
 type WebSocketListener = (data: any) => void;
 
-class TraccarWebSocket {
+class ElevaticsWebSocket {
   private ws: WebSocket | null = null;
   private listeners: Map<string, WebSocketListener[]> = new Map();
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay = WS_RECONNECT_DELAY;
   private isConnecting = false;
+  private shouldReconnect = true;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
 
-  connect() {
-    if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
-      return;
-    }
+  async connect() {
+    if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) return;
+
+    const session = await storage.getSession();
+    if (!session) return;
 
     this.isConnecting = true;
-    const url = traccarAPI.getWebSocketUrl();
+    this.shouldReconnect = true;
 
     try {
-      this.ws = new WebSocket(url);
+      const url = elevaticsAPI.getWebSocketUrl();
+      // Append session cookie as query param for WS auth if available
+      const cookie = await storage.getSessionCookie();
+      const wsUrl = cookie
+        ? `${url}?${cookie.replace('JSESSIONID=', 'token=').replace(/;.*/, '')}`
+        : url;
+
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
         this.isConnecting = false;
+        this.reconnectDelay = WS_RECONNECT_DELAY;
         this.emit('connected', true);
+        this.startPing();
       };
 
       this.ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-
-          if (data.positions) {
-            this.emit('positions', data.positions);
-          }
-
-          if (data.devices) {
-            this.emit('devices', data.devices);
-          }
-
-          if (data.events) {
-            this.emit('events', data.events);
-          }
-        } catch (error) {
-          console.error('WebSocket message parse error:', error);
+          const data = JSON.parse(event.data as string);
+          if (data.positions?.length) this.emit('positions', data.positions);
+          if (data.devices?.length) this.emit('devices', data.devices);
+          if (data.events?.length) this.emit('events', data.events);
+        } catch {
+          // ignore malformed frames
         }
       };
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      this.ws.onerror = () => {
         this.isConnecting = false;
       };
 
       this.ws.onclose = () => {
-        console.log('WebSocket closed');
         this.isConnecting = false;
+        this.stopPing();
         this.emit('connected', false);
-        this.scheduleReconnect();
+        if (this.shouldReconnect) this.scheduleReconnect();
       };
-    } catch (error) {
-      console.error('WebSocket connection error:', error);
+    } catch {
       this.isConnecting = false;
-      this.scheduleReconnect();
+      if (this.shouldReconnect) this.scheduleReconnect();
     }
   }
 
   disconnect() {
+    this.shouldReconnect = false;
+    this.stopPing();
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -75,38 +82,56 @@ class TraccarWebSocket {
     }
   }
 
+  get isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  private startPing() {
+    this.stopPing();
+    // Keep-alive every 25 seconds
+    this.pingInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try { this.ws.send('ping'); } catch {}
+      }
+    }, 25_000);
+  }
+
+  private stopPing() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
   private scheduleReconnect() {
     if (this.reconnectTimeout) return;
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectTimeout = null;
+      // Exponential backoff capped at max delay
+      this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, WS_MAX_RECONNECT_DELAY);
       this.connect();
-    }, 5000);
+    }, this.reconnectDelay);
   }
 
-  on(event: string, callback: WebSocketListener) {
+  on(event: WebSocketEvent | string, callback: WebSocketListener) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event)?.push(callback);
+    this.listeners.get(event)!.push(callback);
   }
 
-  off(event: string, callback: WebSocketListener) {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
+  off(event: WebSocketEvent | string, callback: WebSocketListener) {
+    const list = this.listeners.get(event);
+    if (list) {
+      const idx = list.indexOf(callback);
+      if (idx > -1) list.splice(idx, 1);
     }
   }
 
   private emit(event: string, data: any) {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.forEach(callback => callback(data));
-    }
+    this.listeners.get(event)?.forEach(cb => cb(data));
   }
 }
 
-export const traccarWS = new TraccarWebSocket();
+export const elevaticsWS = new ElevaticsWebSocket();

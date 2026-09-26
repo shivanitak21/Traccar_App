@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLES } from '../api/config';
+import { darkColors } from '../theme/themes';
+import { typography } from '../theme/typography';
 
 interface Marker {
   id: string;
@@ -12,15 +15,19 @@ interface Marker {
   deviceName?: string;
   deviceModel?: string;
   status?: string;
+  course?: number;
 }
 
 interface Polyline {
+  id?: string;
   coordinates: { latitude: number; longitude: number }[];
   color?: string;
   width?: number;
+  opacity?: number;
+  dashed?: boolean;
 }
 
-export type MapLayerType = 'normal' | 'satellite' | 'terrain' | 'hybrid';
+export type MapLayerType = 'normal' | 'satellite' | 'terrain' | 'hybrid' | 'streets';
 export type DrawingMode = 'none' | 'polygon' | 'rectangle';
 
 interface WebMapViewProps {
@@ -41,7 +48,12 @@ interface WebMapViewProps {
   onGeofencePress?: (geofenceId: number) => void;
   drawingMode?: DrawingMode;
   onGeofenceDrawn?: (area: string) => void;
+  fitToMarkers?: boolean;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
   style?: any;
+  smoothPlayback?: boolean;
+  followMarker?: boolean;
 }
 
 export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
@@ -57,10 +69,23 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
   onGeofencePress,
   drawingMode = 'none',
   onGeofenceDrawn,
+  fitToMarkers = false,
+  onInteractionStart,
+  onInteractionEnd,
   style,
+  smoothPlayback = false,
+  followMarker = false,
 }) => {
   const webViewRef = useRef<WebView>(null);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapDataRef = useRef<Record<string, unknown> | null>(null);
+  const onInteractionStartRef = useRef(onInteractionStart);
+  const onInteractionEndRef = useRef(onInteractionEnd);
+
+  useEffect(() => {
+    onInteractionStartRef.current = onInteractionStart;
+    onInteractionEndRef.current = onInteractionEnd;
+  }, [onInteractionStart, onInteractionEnd]);
 
   // Memoize map data to prevent unnecessary updates
   const mapData = useMemo(() => ({
@@ -72,42 +97,44 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     geofences,
     selectedGeofenceId,
     drawingMode,
-  }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode]);
+    smoothPlayback,
+    followMarker,
+    fitToMarkers,
+  }), [markers, polylines, center, zoom, mapLayer, geofences, selectedGeofenceId, drawingMode, smoothPlayback, followMarker, fitToMarkers]);
 
-  const updateMap = useCallback(() => {
-    if (webViewRef.current) {
-      // Clear any pending updates
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+  mapDataRef.current = mapData;
+
+  const flushMapUpdate = useCallback(() => {
+    if (!webViewRef.current) return;
+    const script = `
+      if (window.updateMapData) {
+        window.updateMapData(${JSON.stringify(mapDataRef.current)});
       }
-      
-      // Throttle updates to prevent excessive re-renders
-      updateTimeoutRef.current = setTimeout(() => {
-        if (webViewRef.current) {
-          const script = `
-            if (window.updateMapData) {
-              window.updateMapData(${JSON.stringify(mapData)});
-            }
-            true;
-          `;
-          webViewRef.current.injectJavaScript(script);
-        }
-      }, 50);
+      true;
+    `;
+    webViewRef.current.injectJavaScript(script);
+  }, []);
+
+  const scheduleMapUpdate = useCallback(() => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
     }
-  }, [mapData]);
+    updateTimeoutRef.current = setTimeout(() => {
+      updateTimeoutRef.current = null;
+      flushMapUpdate();
+    }, 50);
+  }, [flushMapUpdate]);
 
   useEffect(() => {
-    // Small delay to ensure WebView is ready
-    const timer = setTimeout(() => {
-      updateMap();
-    }, 100);
-    return () => {
-      clearTimeout(timer);
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, [updateMap]);
+    scheduleMapUpdate();
+  }, [mapData, scheduleMapUpdate]);
+
+  useEffect(() => () => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleMessage = useCallback((event: any) => {
     try {
@@ -118,13 +145,19 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         onGeofencePress(data.geofenceId);
       } else if (data.type === 'geofenceDrawn' && onGeofenceDrawn) {
         onGeofenceDrawn(data.area);
+      } else if (data.type === 'interactionStart') {
+        onInteractionStartRef.current?.();
+      } else if (data.type === 'interactionEnd') {
+        onInteractionEndRef.current?.();
       }
     } catch (error) {
       console.error('Error parsing WebView message:', error);
     }
   }, [onMarkerPress, onGeofencePress, onGeofenceDrawn]);
 
-  const html = `
+  const mapboxToken = MAPBOX_ACCESS_TOKEN;
+
+  const html = useMemo(() => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -161,6 +194,11 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     .geofence-label::before {
       display: none !important;
     }
+    .custom-marker-icon {
+      background: transparent !important;
+      border: none !important;
+      overflow: visible !important;
+    }
     .pulse-marker {
       width: 30px;
       height: 30px;
@@ -170,29 +208,41 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       animation: pulse 2s infinite;
     }
     .device-marker {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #00f3ff;
-      border: 3px solid #fff;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.8);
+      width: 26px;
+      height: 50px;
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      position: relative;
+      transform-origin: 50% 50%;
     }
-    .device-marker::before {
-      content: '🚗';
-      font-size: 24px;
+    .device-marker svg {
+      width: 22px;
+      height: 44px;
+      overflow: visible;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
     }
-    .device-marker.online {
-      background: #00ff88;
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.8);
+    .device-marker .car-body {
+      fill: #22c55e;
     }
-    .device-marker.offline {
-      background: #666;
-      box-shadow: 0 0 15px rgba(102, 102, 102, 0.8);
+    .device-marker.online .car-body,
+    .device-marker.moving .car-body {
+      fill: #22c55e;
+    }
+    .device-marker.offline .car-body {
+      fill: #ef4444;
+    }
+    .pin-marker {
+      width: 28px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin-marker svg {
+      width: 24px;
+      height: 36px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
     }
     @keyframes pulse {
       0%, 100% {
@@ -218,19 +268,167 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     let currentTileLayer;
     let currentLayerType = '${mapLayer}';
     let geofencesLayer = [];
+    let playbackMarker = null;
+    let playbackTrail = null;
+    let playbackTrailOutline = null;
+    let playbackInitialized = false;
+
+    function isVehicleMarker(marker) {
+      return !!(marker && (marker.status || marker.deviceName || typeof marker.course === 'number'));
+    }
+
+    function vehicleStatusClass(marker) {
+      if (marker.status === 'online') return 'online';
+      if (marker.status === 'moving') return 'moving';
+      return 'offline';
+    }
+
+    function carSvg() {
+      return '<svg viewBox="0 0 36 72" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect class="car-body" x="4" y="2" width="28" height="68" rx="8" fill="#22c55e" stroke="#ffffff" stroke-width="2"/>' +
+        '<path fill="#0f172a" opacity="0.55" d="M10 16h16l3 13H7z"/>' +
+        '<path fill="#0f172a" opacity="0.4" d="M7 46h22l-3 13H10z"/>' +
+        '</svg>';
+    }
+
+    function pinSvg(color) {
+      const fill = color || '#0A84FF';
+      return '<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">' +
+        '<path fill="' + fill + '" stroke="#ffffff" stroke-width="1.6" d="M12 1.4C6.7 1.4 2.4 5.7 2.4 11c0 7.2 9.6 22.2 9.6 22.2S21.6 18.2 21.6 11C21.6 5.7 17.3 1.4 12 1.4z"/>' +
+        '<circle cx="12" cy="11" r="4.1" fill="#ffffff"/>' +
+        '</svg>';
+    }
+
+    function buildMarkerIcon(marker) {
+      if (!isVehicleMarker(marker)) {
+        return L.divIcon({
+          className: 'custom-marker-icon',
+          iconSize: [28, 40],
+          iconAnchor: [14, 38],
+          popupAnchor: [0, -36],
+          html: '<div class="pin-marker">' + pinSvg(marker.color) + '</div>'
+        });
+      }
+
+      const statusClass = vehicleStatusClass(marker);
+      const heading = marker.course || 0;
+      return L.divIcon({
+        className: 'custom-marker-icon',
+        iconSize: [26, 50],
+        iconAnchor: [13, 25],
+        popupAnchor: [0, -22],
+        html: '<div class="device-marker ' + statusClass + '" style="transform:rotate(' + heading + 'deg);">' + carSvg() + '</div>'
+      });
+    }
+
+    function updateMarkerAppearance(markerLayer, marker) {
+      if (!markerLayer || !markerLayer._icon) return;
+      const el = markerLayer._icon.querySelector('.device-marker');
+      if (!el) return;
+      el.style.transform = 'rotate(' + (marker.course || 0) + 'deg)';
+      el.className = 'device-marker ' + vehicleStatusClass(marker);
+    }
+
+    function syncMapLayer(layerType) {
+      if (layerType && layerType !== currentLayerType) {
+        currentLayerType = layerType;
+        setMapLayer(layerType);
+      }
+    }
+
+    function updateSmoothPlayback(data) {
+      if (!map) return;
+
+      syncMapLayer(data.mapLayer);
+
+      const marker = data.markers && data.markers[0];
+      const trailPoly = data.polylines && data.polylines.find(p => p.id === 'trail')
+        || (data.polylines && data.polylines[data.polylines.length - 1]);
+
+      if (marker) {
+        if (!playbackMarker) {
+          playbackMarker = L.marker([marker.latitude, marker.longitude], {
+            icon: buildMarkerIcon(marker),
+            zIndexOffset: 1000,
+          }).addTo(map);
+        } else {
+          playbackMarker.setLatLng([marker.latitude, marker.longitude]);
+          updateMarkerAppearance(playbackMarker, marker);
+        }
+      }
+
+      if (trailPoly && trailPoly.coordinates && trailPoly.coordinates.length > 1) {
+        const coords = trailPoly.coordinates.map(c => [c.latitude, c.longitude]);
+        const weight = trailPoly.width || 6;
+        const opacity = trailPoly.opacity !== undefined ? trailPoly.opacity : 1;
+
+        if (!playbackTrail) {
+          playbackTrailOutline = L.polyline(coords, {
+            color: '#ffffff',
+            weight: weight + 4,
+            opacity: 0.45,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(map);
+          playbackTrail = L.polyline(coords, {
+            color: trailPoly.color || '#0A84FF',
+            weight: weight,
+            opacity: opacity,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(map);
+        } else {
+          playbackTrailOutline.setLatLngs(coords);
+          playbackTrail.setLatLngs(coords);
+          playbackTrail.setStyle({
+            color: trailPoly.color || '#0A84FF',
+            weight: weight,
+            opacity: opacity,
+          });
+        }
+      }
+
+      if (data.followMarker && marker) {
+        const trackingZoom = data.zoom || 17;
+        if (!playbackInitialized) {
+          map.setView([marker.latitude, marker.longitude], trackingZoom);
+          playbackInitialized = true;
+        } else {
+          map.panTo([marker.latitude, marker.longitude], {
+            animate: false,
+            noMoveStart: true,
+          });
+        }
+      } else if (!playbackInitialized && data.center) {
+        map.setView([data.center.latitude, data.center.longitude], data.zoom || 14);
+        playbackInitialized = true;
+      }
+    }
+
+    function resetPlaybackLayers() {
+      if (playbackMarker && map.hasLayer(playbackMarker)) map.removeLayer(playbackMarker);
+      if (playbackTrail && map.hasLayer(playbackTrail)) map.removeLayer(playbackTrail);
+      if (playbackTrailOutline && map.hasLayer(playbackTrailOutline)) map.removeLayer(playbackTrailOutline);
+      playbackMarker = null;
+      playbackTrail = null;
+      playbackTrailOutline = null;
+      playbackInitialized = false;
+    }
 
     function getTileLayerUrl(layerType) {
-      switch(layerType) {
-        case 'satellite':
-          return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        case 'terrain':
-          return 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
-        case 'hybrid':
-          // For hybrid, we'll use satellite as base
-          return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        default:
-          return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      const token = '${mapboxToken}';
+      if (!token) {
+        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       }
+      const styleMap = {
+        normal: '${MAPBOX_STYLES.dark}',
+        streets: '${MAPBOX_STYLES.streets}',
+        satellite: '${MAPBOX_STYLES.satellite}',
+        terrain: '${MAPBOX_STYLES.terrain}',
+        hybrid: '${MAPBOX_STYLES.satellite}',
+      };
+      const styleId = styleMap[layerType] || styleMap.normal;
+      return 'https://api.mapbox.com/styles/v1/' + styleId + '/tiles/256/{z}/{x}/{y}@2x?access_token=' + token;
     }
 
     function setMapLayer(layerType) {
@@ -240,25 +438,33 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       
       const url = getTileLayerUrl(layerType);
       currentTileLayer = L.tileLayer(url, {
-        maxZoom: 19,
-        attribution: ''
+        maxZoom: 22,
+        tileSize: 256,
+        zoomOffset: 0,
+        attribution: '© Mapbox © OpenStreetMap'
       }).addTo(map);
-
-      // For hybrid, add street labels on top
-      if (layerType === 'hybrid') {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          opacity: 0.5,
-          attribution: ''
-        }).addTo(map);
-      }
     }
 
     function initMap() {
       map = L.map('map', {
         zoomControl: true,
-        attributionControl: false
-      }).setView([${center.latitude}, ${center.longitude}], ${zoom});
+        attributionControl: false,
+        touchZoom: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        boxZoom: true,
+        dragging: true,
+      }).setView([20.5937, 78.9629], 5);
+
+      function notifyInteraction(active) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: active ? 'interactionStart' : 'interactionEnd'
+        }));
+      }
+
+      map.on('touchstart', () => notifyInteraction(true));
+      map.on('touchend', () => notifyInteraction(false));
+      map.on('touchcancel', () => notifyInteraction(false));
 
       setMapLayer('${mapLayer}');
 
@@ -280,14 +486,14 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       map.addLayer(drawnItems);
 
       updateMapData({
-        markers: ${JSON.stringify(markers)},
-        polylines: ${JSON.stringify(polylines)},
-        center: ${JSON.stringify(center)},
-        zoom: ${zoom},
+        markers: [],
+        polylines: [],
+        center: { latitude: 20.5937, longitude: 78.9629 },
+        zoom: 5,
         mapLayer: '${mapLayer}',
-        geofences: ${JSON.stringify(geofences)},
-        selectedGeofenceId: ${selectedGeofenceId || 'null'},
-        drawingMode: '${drawingMode}'
+        geofences: [],
+        selectedGeofenceId: null,
+        drawingMode: 'none'
       });
     }
     
@@ -297,7 +503,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
 
     function parseGeofenceArea(area) {
       try {
-        // Traccar geofence area format: "CIRCLE (lat lon radius)" or "POLYGON ((lat1 lon1, lat2 lon2, ...))"
+        // Elevatics IoT geofence area format: "CIRCLE (lat lon radius)" or "POLYGON ((lat1 lon1, lat2 lon2, ...))"
         if (area.startsWith('CIRCLE')) {
           const match = area.match(/CIRCLE\\s*\\(([^)]+)\\)/);
           if (match) {
@@ -324,11 +530,15 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     }
 
     window.updateMapData = function(data) {
-      // Update map layer if changed
-      if (data.mapLayer && data.mapLayer !== currentLayerType) {
-        currentLayerType = data.mapLayer;
-        setMapLayer(data.mapLayer);
+      if (data.smoothPlayback && map) {
+        updateSmoothPlayback(data);
+        return;
       }
+
+      resetPlaybackLayers();
+
+      // Update map layer if changed
+      syncMapLayer(data.mapLayer);
 
       // Remove all existing markers, polylines, and geofences
       markersLayer.forEach(m => {
@@ -357,10 +567,6 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         disableDrawing();
       }
 
-      if (data.center && map) {
-        map.setView([data.center.latitude, data.center.longitude], data.zoom || 13);
-      }
-
       if (data.markers && Array.isArray(data.markers)) {
         // STRICT deduplication - only ONE marker per unique ID
         const processedIds = new Set();
@@ -372,17 +578,8 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
             return;
           }
           processedIds.add(marker.id);
-          
-          const statusClass = marker.status === 'online' ? 'online' : 'offline';
-          
-          // Create icon WITHOUT nested div to prevent visual duplication
-          const icon = L.divIcon({
-            className: 'custom-marker-icon',
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            popupAnchor: [0, -20],
-            html: '<div class="device-marker ' + statusClass + '" style="width:100%;height:100%;"></div>'
-          });
+
+          const icon = buildMarkerIcon(marker);
 
           const m = L.marker([marker.latitude, marker.longitude], { icon })
             .addTo(map);
@@ -407,6 +604,17 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
         console.log('WebMapView: Added', processedIds.size, 'unique markers');
       }
 
+      if (data.fitToMarkers && markersLayer.length > 0) {
+        const group = L.featureGroup(markersLayer);
+        map.fitBounds(group.getBounds(), {
+          padding: [48, 48],
+          maxZoom: 14,
+          animate: false,
+        });
+      } else if (data.center && map && !data.smoothPlayback) {
+        map.setView([data.center.latitude, data.center.longitude], data.zoom || 13);
+      }
+
       // Add geofences
       if (data.geofences && Array.isArray(data.geofences)) {
         data.geofences.forEach(geofence => {
@@ -414,7 +622,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           if (!areaData) return;
 
           const isSelected = data.selectedGeofenceId === geofence.id;
-          const color = isSelected ? '#ff0055' : (geofence.color || '#00f3ff');
+          const color = isSelected ? '#0A84FF' : (geofence.color || '#00f3ff');
           const opacity = isSelected ? 0.4 : 0.2;
           const weight = isSelected ? 3 : 2;
 
@@ -484,10 +692,26 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
       if (data.polylines) {
         data.polylines.forEach(polyline => {
           const coords = polyline.coordinates.map(c => [c.latitude, c.longitude]);
+          const weight = polyline.width || 4;
+          const opacity = polyline.opacity !== undefined ? polyline.opacity : 0.9;
+
+          // White halo for visibility on dark maps
+          const outline = L.polyline(coords, {
+            color: '#ffffff',
+            weight: weight + 5,
+            opacity: Math.min(0.55, opacity * 0.45),
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(map);
+          polylinesLayer.push(outline);
+
           const p = L.polyline(coords, {
-            color: polyline.color || '#00f3ff',
-            weight: polyline.width || 3,
-            opacity: 0.8
+            color: polyline.color || '#10b981',
+            weight: weight,
+            opacity: opacity,
+            dashArray: polyline.dashed ? '10, 12' : null,
+            lineCap: 'round',
+            lineJoin: 'round',
           }).addTo(map);
           polylinesLayer.push(p);
         });
@@ -508,7 +732,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
           drawnItems.clearLayers();
           drawnItems.addLayer(layer);
           
-          // Convert to Traccar format
+          // Convert to Elevatics IoT format
           const latlngs = layer.getLatLngs()[0];
           const coords = latlngs.map(ll => ll.lat + ' ' + ll.lng).join(', ');
           const area = 'POLYGON ((' + coords + '))';
@@ -527,7 +751,7 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
            drawnItems.clearLayers();
            drawnItems.addLayer(layer);
            
-           // Convert rectangle to Traccar POLYGON format
+           // Convert rectangle to Elevatics IoT POLYGON format
            // Get the bounds of the rectangle
            const bounds = layer.getBounds();
            const sw = bounds.getSouthWest(); // Southwest corner
@@ -564,37 +788,72 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
   </script>
 </body>
 </html>
-  `;
+  `, [mapboxToken, showUserLocation]);
+
+  const webViewSource = useMemo(() => ({ html }), [html]);
 
   return (
     <View style={[styles.container, style]}>
+      {!mapboxToken ? (
+        <View style={styles.tokenWarning}>
+          <Text style={styles.tokenWarningText}>
+            Mapbox token missing. Add EXPO_PUBLIC_MAPBOX_TOKEN to your .env file.
+          </Text>
+        </View>
+      ) : null}
       <WebView
         ref={webViewRef}
-        source={{ html }}
+        source={webViewSource}
         style={styles.webview}
         onMessage={handleMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={true}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState
+        originWhitelist={['*']}
+        mixedContentMode="always"
+        allowsInlineMediaPlayback
+        setSupportMultipleWindows={false}
+        androidLayerType="hardware"
+        nestedScrollEnabled
+        onLoadEnd={flushMapUpdate}
       />
     </View>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for React.memo
-  // Compare arrays by length and key properties
+  if (prevProps.smoothPlayback && nextProps.smoothPlayback) {
+    return false;
+  }
+
   const markersEqual = prevProps.markers?.length === nextProps.markers?.length &&
     (!prevProps.markers || !nextProps.markers || 
      prevProps.markers.every((m, i) => 
        m.id === nextProps.markers![i].id &&
        m.latitude === nextProps.markers![i].latitude &&
-       m.longitude === nextProps.markers![i].longitude
+       m.longitude === nextProps.markers![i].longitude &&
+       m.course === nextProps.markers![i].course &&
+       m.status === nextProps.markers![i].status
      ));
   
   const polylinesEqual = prevProps.polylines?.length === nextProps.polylines?.length &&
     (!prevProps.polylines || !nextProps.polylines ||
-     prevProps.polylines.every((p, i) => 
-       p.coordinates.length === nextProps.polylines![i].coordinates.length
-     ));
+     prevProps.polylines.every((p, i) => {
+       const next = nextProps.polylines![i];
+       if (p.coordinates.length !== next.coordinates.length) return false;
+       if (p.coordinates.length === 0) {
+         return p.color === next.color &&
+           p.width === next.width &&
+           p.opacity === next.opacity &&
+           p.dashed === next.dashed;
+       }
+       const lastPrev = p.coordinates[p.coordinates.length - 1];
+       const lastNext = next.coordinates[next.coordinates.length - 1];
+       return p.color === next.color &&
+         p.width === next.width &&
+         p.opacity === next.opacity &&
+         p.dashed === next.dashed &&
+         lastPrev.latitude === lastNext.latitude &&
+         lastPrev.longitude === lastNext.longitude;
+     }));
   
   const geofencesEqual = prevProps.geofences?.length === nextProps.geofences?.length &&
     (!prevProps.geofences || !nextProps.geofences ||
@@ -611,16 +870,30 @@ export const WebMapView: React.FC<WebMapViewProps> = React.memo(({
     prevProps.mapLayer === nextProps.mapLayer &&
     geofencesEqual &&
     prevProps.selectedGeofenceId === nextProps.selectedGeofenceId &&
-    prevProps.drawingMode === nextProps.drawingMode
+    prevProps.drawingMode === nextProps.drawingMode &&
+    prevProps.smoothPlayback === nextProps.smoothPlayback &&
+    prevProps.followMarker === nextProps.followMarker &&
+    prevProps.fitToMarkers === nextProps.fitToMarkers
   );
 });
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: 300,
+    backgroundColor: darkColors.backgroundSecondary,
   },
   webview: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: 'transparent',
+  },
+  tokenWarning: {
+    padding: 8,
+    backgroundColor: darkColors.warningMuted,
+  },
+  tokenWarningText: {
+    ...typography.small,
+    color: darkColors.warning,
+    textAlign: 'center',
   },
 });

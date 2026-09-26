@@ -1,63 +1,91 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LoginScreen } from '../src/screens/LoginScreen';
-import { storage } from '../src/utils/storage';
-import { traccarAPI } from '../src/api/traccar';
-import { colors } from '../src/theme/colors';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { Redirect } from 'expo-router';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../src/theme/ThemeContext';
+import { useAuthStore } from '../src/stores/authStore';
 
 export default function Index() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, isLoading, hasHydrated, initialize } = useAuthStore();
+  const { colors } = useTheme();
+  const didInitRef = useRef(false);
+
+  const pulse = useSharedValue(0.8);
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+    opacity: pulse.value,
+  }));
 
   useEffect(() => {
-    checkAuth();
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 700 }),
+        withTiming(0.8, { duration: 700 })
+      ),
+      -1
+    );
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      await traccarAPI.initialize();
-      const session = await storage.getSession();
+  useEffect(() => {
+    if (didInitRef.current || hasHydrated) return;
+    didInitRef.current = true;
+    initialize();
+  }, [hasHydrated, initialize]);
 
-      if (session) {
-        setIsAuthenticated(true);
-        router.replace('/(tabs)');
-      } else {
-        setIsAuthenticated(false);
-      }
-    } catch (error) {
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-    router.replace('/(tabs)');
-  };
-
-  if (loading) {
+  if (!hasHydrated || isLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.splash, { backgroundColor: colors.background }]}>
+        <LinearGradient
+          colors={colors.gradient.dark}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View style={[styles.splashLogo, pulseStyle]}>
+          <LinearGradient
+            colors={colors.gradient.brand}
+            style={styles.splashGradient}
+          >
+            <Animated.Text style={[styles.splashLetter, { color: colors.text.inverse }]}>
+              E
+            </Animated.Text>
+          </LinearGradient>
+        </Animated.View>
       </View>
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  if (isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
   }
 
-  return null;
+  return <Redirect href="/login" />;
 }
 
 const styles = StyleSheet.create({
-  loading: {
+  splash: {
     flex: 1,
-    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splashLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  splashGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLetter: {
+    fontSize: 32,
+    fontWeight: '800',
   },
 });
